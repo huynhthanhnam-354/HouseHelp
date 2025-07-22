@@ -1,9 +1,9 @@
 import React from "react";
+import FilterSidebar from "./Housekeeper/FilterSidebar";
+import HousekeeperList from "./Housekeeper/HousekeeperList";
+import QuickInfo from "./Housekeeper/QuickInfo";
+import SpecialOffer from "./Housekeeper/SpecialOffer";
 import { useNavigate } from "react-router-dom";
-import FilterSidebar from "../components/Housekeeper/FilterSidebar";
-import HousekeeperList from "../components/Housekeeper/HousekeeperList";
-import QuickInfo from "../components/Housekeeper/QuickInfo";
-import SpecialOffer from "../components/Housekeeper/SpecialOffer";
 
 function Header() {
   const navigate = useNavigate();
@@ -66,7 +66,7 @@ function Footer() {
   );
 }
 
-export default function HomePage() {
+export default function HomePageView() {
   return (
     <div className="home-root">
       <Header />

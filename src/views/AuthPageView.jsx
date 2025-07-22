@@ -1,10 +1,10 @@
 import React from "react";
-import AuthTabs from "../components/Auth/AuthTabs";
-import LoginForm from "../components/Auth/LoginForm";
-import RegisterCustomerForm from "../components/Auth/RegisterCustomerForm";
-import RegisterHousekeeperForm from "../components/Auth/RegisterHousekeeperForm";
+import AuthTabs from "./Auth/AuthTabs";
+import LoginForm from "./Auth/LoginForm";
+import RegisterCustomerForm from "./Auth/RegisterCustomerForm";
+import RegisterHousekeeperForm from "./Auth/RegisterHousekeeperForm";
 
-export default function AuthPage({ mode }) {
+export default function AuthPageView({ mode }) {
   return (
     <div className="auth-page-layout">
       <div className="auth-left-panel">

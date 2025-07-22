@@ -1,7 +1,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import AuthPage from "./pages/AuthPage";
-import HomePage from "./pages/HomePage";
+import AuthPage from "./controllers/AuthPageController";
+import HomePage from "./controllers/HomePageController";
 import './App.css';
 
 export default function App() {
