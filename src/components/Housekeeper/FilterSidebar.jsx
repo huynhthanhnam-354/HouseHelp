@@ -17,8 +17,14 @@ export default function FilterSidebar({ onFilterChange }) {
   const [componentId] = useState(() => Date.now() + Math.random());
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/filters/services").then(res => res.json()).then(setServices);
-    fetch("http://localhost:5000/api/filters/ratings").then(res => res.json()).then(setRatings);
+    fetch("http://localhost:5000/api/filters/services").then(res => res.json()).then(data => {
+      console.log("Services data:", data);
+      setServices(data);
+    });
+    fetch("http://localhost:5000/api/filters/ratings").then(res => res.json()).then(data => {
+      console.log("Ratings data:", data);
+      setRatings(data);
+    });
     fetch("http://localhost:5000/api/filters/price-range").then(res => res.json()).then(setPriceRange);
     fetch("http://localhost:5000/api/filters/availability").then(res => res.json()).then(setAvailability);
   }, []);
@@ -40,13 +46,19 @@ export default function FilterSidebar({ onFilterChange }) {
   const handleAvailable = e => setFilter(f => ({ ...f, available: e.target.checked ? 1 : null }));
   const handleClear = () => setFilter({ services: [], minRating: null, minPrice: null, maxPrice: null, available: null });
 
+  const uniqueRatings = [...new Set(ratings)].filter(r => r != null);
+  const uniqueServices = [...new Set(services)].filter(s => s != null && s !== "");
+  
+  console.log("Unique ratings:", uniqueRatings);
+  console.log("Unique services:", uniqueServices);
+
   return (
     <div className="filter-sidebar">
       <h3>Filters</h3>
       <div className="filter-section">
         <div className="filter-label">Services</div>
         <div className="filter-services-list">
-          {services.map((s, idx) => (
+          {uniqueServices.map((s, idx) => (
             <label className="filter-service-tag" key={`service-${componentId}-${idx}`}>
               <input type="checkbox" checked={filter.services.includes(s)} onChange={() => handleService(s)} /> {s}
             </label>
@@ -56,7 +68,7 @@ export default function FilterSidebar({ onFilterChange }) {
       <div className="filter-section">
         <div className="filter-label">Minimum Rating</div>
         <div className="filter-rating-list">
-          {ratings.map((r, idx) => (
+          {uniqueRatings.map((r, idx) => (
             <label className="filter-rating-tag" key={`rating-${componentId}-${idx}`}>
               <input type="radio" name={`minRating-${componentId}`} checked={filter.minRating === r} onChange={() => handleRating(r)} />
               <span className="filter-stars">{"★".repeat(r)}<span className="filter-stars-empty">{"☆".repeat(5 - r)}</span></span>

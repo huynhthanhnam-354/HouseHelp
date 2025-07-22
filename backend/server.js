@@ -20,36 +20,147 @@ db.connect(err => {
   console.log('MySQL Connected!');
 });
 
-// API: Lấy tất cả housekeepers (join với users để lấy tên và tính rating từ reviews)
+// API: Lấy tất cả housekeepers (filter dịch vụ theo bảng housekeeper_services, OR logic)
 app.get('/api/housekeepers', (req, res) => {
-  const sql = `
-    SELECT h.*, u.fullName, u.email, u.phone,
-           COALESCE(AVG(r.rating), 0) as avgRating,
-           COUNT(r.id) as reviewCount
-    FROM housekeepers h
-    JOIN users u ON h.userId = u.id
-    LEFT JOIN reviews r ON h.id = r.housekeeperId
-    GROUP BY h.id, h.userId, h.services, h.price, h.available, h.description, u.fullName, u.email, u.phone
-  `;
-  db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ error: err });
-    // Thêm initials cho avatar
-    const housekeepersWithInitials = results.map(hk => ({
-      ...hk,
-      initials: hk.fullName.split(' ').map(n => n[0]).join('').toUpperCase(),
-      rating: parseFloat(hk.avgRating).toFixed(1) // Làm tròn rating đến 1 chữ số thập phân
-    }));
-    res.json(housekeepersWithInitials);
-  });
+  const { services, minRating, maxPrice, available } = req.query;
+  
+  // Nếu có filter services, trước tiên cần chuyển tên service thành serviceId
+  if (services) {
+    const serviceNames = services.split(",");
+    const getServiceIdsSql = `SELECT id FROM services WHERE name IN (${serviceNames.map(() => "?").join(",")})`;
+    
+    db.query(getServiceIdsSql, serviceNames, (err, serviceResults) => {
+      if (err) return res.status(500).json({ error: err });
+      
+      console.log('ServiceNames:', serviceNames);
+      console.log('ServiceResults:', serviceResults);
+      
+      const serviceIds = serviceResults.map(s => s.id);
+      console.log('ServiceIds:', serviceIds);
+      
+      if (serviceIds.length === 0) {
+        console.log('No services found, returning empty array');
+        return res.json([]); // Không có service nào match
+      }
+      
+      // Tiếp tục với query chính
+      executeMainQuery(serviceIds);
+    });
+  } else {
+    // Không có filter services, query bình thường
+    executeMainQuery(null);
+  }
+  
+  function executeMainQuery(serviceIds) {
+    let sql = `
+      SELECT h.*, u.fullName, u.email, u.phone,
+             COALESCE(AVG(r.rating), 0) as avgRating,
+             COUNT(r.id) as reviewCount
+      FROM housekeepers h
+      JOIN users u ON h.userId = u.id
+      LEFT JOIN reviews r ON h.id = r.housekeeperId
+    `;
+    const where = [];
+    const having = [];
+    const params = [];
+
+    if (serviceIds && serviceIds.length > 0) {
+      sql += ` JOIN housekeeper_services hs ON h.id = hs.housekeeperId`;
+      where.push(`hs.serviceId IN (${serviceIds.map(() => "?").join(",")})`);
+      params.push(...serviceIds);
+    }
+    if (maxPrice) {
+      where.push(`h.price <= ?`);
+      params.push(Number(maxPrice));
+    }
+    if (available) {
+      where.push(`h.available = ?`);
+      params.push(Number(available));
+    }
+
+    if (where.length) {
+      sql += ` WHERE ` + where.join(" AND ");
+    }
+    sql += ` GROUP BY h.id, h.userId, h.services, h.price, h.available, h.description, u.fullName, u.email, u.phone`;
+    // BỎ HAVING COUNT(DISTINCT hs.serviceId) = ... để filter OR
+    if (minRating) {
+      having.push(`AVG(r.rating) >= ?`);
+      params.push(Number(minRating));
+    }
+    if (having.length) {
+      sql += ` HAVING ` + having.join(" AND ");
+    }
+
+    console.log('Final SQL:', sql);
+    console.log('Final Params:', params);
+    
+    db.query(sql, params, (err, results) => {
+      if (err) {
+        console.log('SQL Error:', err);
+        return res.status(500).json({ error: err });
+      }
+      
+      console.log('Query Results:', results);
+      
+      const housekeepersWithInitials = results.map(hk => ({
+        ...hk,
+        initials: hk.fullName.split(' ').map(n => n[0]).join('').toUpperCase(),
+        rating: parseFloat(hk.avgRating).toFixed(1)
+      }));
+      res.json(housekeepersWithInitials);
+    });
+  }
 });
 
 // API: Đăng ký user mới
 app.post('/api/register', (req, res) => {
-  const { fullName, email, password, phone, role, idCardFront, idCardBack } = req.body;
+  const { fullName, email, password, phone, role, idCardFront, idCardBack, services } = req.body;
   const sql = 'INSERT INTO users (fullName, email, password, phone, role, idCardFront, idCardBack) VALUES (?, ?, ?, ?, ?, ?, ?)';
   db.query(sql, [fullName, email, password, phone, role, idCardFront, idCardBack], (err, result) => {
     if (err) return res.status(500).json({ error: err });
-    res.json({ id: result.insertId, fullName, email, phone, role, idCardFront, idCardBack });
+    
+    const userId = result.insertId;
+    
+    // Nếu là housekeeper và có services, tạo housekeeper record và liên kết services
+    if (role === 'housekeeper' && services && services.length > 0) {
+      // Tạo housekeeper record
+      const housekeeperSql = 'INSERT INTO housekeepers (userId, rating, services, price, available, description) VALUES (?, ?, ?, ?, ?, ?)';
+      const servicesString = services.join(',');
+      
+      db.query(housekeeperSql, [userId, 0, servicesString, 0, 1, ''], (err, housekeeperResult) => {
+        if (err) return res.status(500).json({ error: err });
+        
+        const housekeeperId = housekeeperResult.insertId;
+        
+        // Lấy serviceIds từ service names
+        const getServiceIdsSql = `SELECT id, name FROM services WHERE name IN (${services.map(() => "?").join(",")})`;
+        
+        db.query(getServiceIdsSql, services, (err, serviceResults) => {
+          if (err) return res.status(500).json({ error: err });
+          
+          // Tạo các liên kết trong housekeeper_services
+          const insertPromises = serviceResults.map(service => {
+            return new Promise((resolve, reject) => {
+              db.query('INSERT INTO housekeeper_services (housekeeperId, serviceId) VALUES (?, ?)', 
+                [housekeeperId, service.id], (err, result) => {
+                  if (err) reject(err);
+                  else resolve(result);
+                });
+            });
+          });
+          
+          Promise.all(insertPromises)
+            .then(() => {
+              res.json({ id: userId, fullName, email, phone, role, idCardFront, idCardBack, housekeeperId });
+            })
+            .catch(err => {
+              res.status(500).json({ error: err });
+            });
+        });
+      });
+    } else {
+      res.json({ id: userId, fullName, email, phone, role, idCardFront, idCardBack });
+    }
   });
 });
 

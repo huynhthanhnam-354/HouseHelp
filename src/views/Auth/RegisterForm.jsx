@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Input from "../Common/Input";
 import Button from "../Common/Button";
@@ -24,17 +24,37 @@ export default function RegisterForm() {
     role: "customer",
     idFront: null,
     idBack: null,
+    services: [],
     agree: false,
   });
+  const [availableServices, setAvailableServices] = useState([]);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
+  // Fetch available services for housekeeper registration
+  useEffect(() => {
+    fetch("http://localhost:5000/api/filters/services")
+      .then(res => res.json())
+      .then(data => setAvailableServices(data))
+      .catch(err => console.error("Failed to load services:", err));
+  }, []);
+
   const handleChange = (field, value) => {
     setForm(f => ({ ...f, [field]: value }));
     setErrors(e => ({ ...e, [field]: undefined }));
     setSubmitError("");
+  };
+
+  const handleServiceChange = (serviceName) => {
+    setForm(f => ({
+      ...f,
+      services: f.services.includes(serviceName)
+        ? f.services.filter(s => s !== serviceName)
+        : [...f.services, serviceName]
+    }));
+    setErrors(e => ({ ...e, services: undefined }));
   };
 
   const validate = () => {
@@ -52,6 +72,7 @@ export default function RegisterForm() {
     if (form.role === "housekeeper") {
       if (!form.idFront) err.idFront = "ID Card (Front) is required.";
       if (!form.idBack) err.idBack = "ID Card (Back) is required.";
+      if (!form.services.length) err.services = "Please select at least one service.";
     }
     if (!form.agree) err.agree = "You must agree to the terms.";
     return err;
@@ -72,6 +93,7 @@ export default function RegisterForm() {
         role: form.role,
         idCardFront: form.role === "housekeeper" ? (form.idFront ? form.idFront.name : "") : "",
         idCardBack: form.role === "housekeeper" ? (form.idBack ? form.idBack.name : "") : "",
+        services: form.role === "housekeeper" ? form.services : [],
       });
       if (res.error) {
         setSubmitError(res.error);
@@ -86,6 +108,7 @@ export default function RegisterForm() {
           role: "customer",
           idFront: null,
           idBack: null,
+          services: [],
           agree: false,
         });
         setTimeout(() => navigate("/login"), 1200);
@@ -130,6 +153,22 @@ export default function RegisterForm() {
       {errors.role && <div className="form-error">{errors.role}</div>}
       {form.role === "housekeeper" && (
         <>
+          <div className="services-selection">
+            <label className="form-label">Services You Provide</label>
+            <div className="services-grid">
+              {availableServices.map(service => (
+                <label key={service} className="service-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={form.services.includes(service)}
+                    onChange={() => handleServiceChange(service)}
+                  />
+                  <span>{service}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          {errors.services && <div className="form-error">{errors.services}</div>}
           <UploadBox label="ID Card (Front)" file={form.idFront} onChange={f => handleChange("idFront", f)} />
           {errors.idFront && <div className="form-error">{errors.idFront}</div>}
           <UploadBox label="ID Card (Back)" file={form.idBack} onChange={f => handleChange("idBack", f)} />

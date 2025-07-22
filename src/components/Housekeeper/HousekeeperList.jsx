@@ -19,7 +19,6 @@ export default function HousekeeperList({ filter }) {
       .then(data => setHousekeepers(data));
   }, [filter]);
 
-  // Tạo mảng đủ 3 phần tử, thêm placeholder nếu thiếu
   const displayList = [
     ...housekeepers,
     ...Array(Math.max(0, 3 - housekeepers.length)).fill({ placeholder: true })

@@ -257,6 +257,46 @@ body, html {
   margin-top: 4px;
 }
 
+/* --- Services Selection --- */
+.services-selection {
+  margin-bottom: 20px;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.service-checkbox {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.service-checkbox:hover {
+  border-color: #007bff;
+  background-color: #f8f9fa;
+}
+
+.service-checkbox input[type="checkbox"]:checked + span {
+  color: #007bff;
+  font-weight: 600;
+}
+
+.service-checkbox input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.service-checkbox span {
+  font-size: 14px;
+}
+
 /* --- Home Page Layout --- */
 .home-layout {
   display: flex;

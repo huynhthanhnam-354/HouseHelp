@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import FilterSidebar from "./Housekeeper/FilterSidebar";
 import HousekeeperList from "./Housekeeper/HousekeeperList";
 import QuickInfo from "./Housekeeper/QuickInfo";
@@ -67,15 +67,17 @@ function Footer() {
 }
 
 export default function HomePageView() {
+  const [filter, setFilter] = useState({});
+  
   return (
     <div className="home-root">
       <Header />
       <div className="home-layout">
         <aside className="sidebar">
-          <FilterSidebar />
+          <FilterSidebar onFilterChange={setFilter} />
         </aside>
         <main className="main-content">
-          <HousekeeperList />
+          <HousekeeperList filter={filter} />
         </main>
         <aside className="rightbar">
           <QuickInfo />
