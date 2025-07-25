@@ -1,10 +1,28 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import useAuth from "../hooks/useAuth";
 
 export default function Header({ keyword, setKeyword, onSearch }) {
   const navigate = useNavigate();
+  const { isAuthenticated, user, logout } = useAuth();
+  
   const handleLogin = () => navigate("/login");
   const handleRegister = () => navigate("/register");
+  const handleLogout = () => {
+    logout();
+  };
+  
+  // Generate user initials
+  const getUserInitials = (fullName) => {
+    if (!fullName) return "U";
+    return fullName
+      .split(' ')
+      .map(name => name[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+  
   return (
     <header className="main-header">
       <div className="header-left">
@@ -21,8 +39,19 @@ export default function Header({ keyword, setKeyword, onSearch }) {
         <button className="search-btn" onClick={onSearch}>Search</button>
       </div>
       <div className="header-right">
-        <button className="header-login" onClick={handleLogin}>Login</button>
-        <button className="header-register" onClick={handleRegister}>Register</button>
+        {isAuthenticated ? (
+          <div className="header-user-section">
+            <div className="header-avatar" title={user?.fullName}>
+              {getUserInitials(user?.fullName)}
+            </div>
+            <button className="header-logout" onClick={handleLogout}>Logout</button>
+          </div>
+        ) : (
+          <>
+            <button className="header-login" onClick={handleLogin}>Login</button>
+            <button className="header-register" onClick={handleRegister}>Register</button>
+          </>
+        )}
       </div>
     </header>
   );

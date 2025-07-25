@@ -5,6 +5,7 @@ import Button from "../Common/Button";
 import Checkbox from "../Common/Checkbox";
 import GoogleAuthButton from "../Common/GoogleAuthButton";
 import { login as loginApi } from "../../api/userApi";
+import useAuth from "../../hooks/useAuth";
 
 function validateEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -17,6 +18,7 @@ export default function LoginForm() {
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const validate = () => {
     const err = {};
@@ -37,7 +39,7 @@ export default function LoginForm() {
       if (res.error) {
         setSubmitError(res.error);
       } else {
-        localStorage.setItem("househelp_user", JSON.stringify(res));
+        login(res); // Use useAuth login method
         navigate("/");
       }
     } catch (e) {
