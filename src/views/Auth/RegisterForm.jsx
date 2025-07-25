@@ -59,7 +59,17 @@ export default function RegisterForm() {
 
   const validate = () => {
     const err = {};
-    if (!form.fullName.trim()) err.fullName = "Full name is required.";
+    const fullName = form.fullName.trim();
+
+    // Không được để trống
+    if (!fullName) err.fullName = "Full name is required.";
+    // Không chứa số hoặc ký tự đặc biệt
+    else if (!/^[A-Za-zÀ-ỹ\s]+$/.test(fullName)) err.fullName = "Full name không được chứa số hoặc ký tự đặc biệt.";
+    // Có ít nhất 2 từ
+    else if (fullName.split(/\s+/).length < 2) err.fullName = "Full name phải có ít nhất 2 từ.";
+    // Bắt đầu bằng chữ cái
+    else if (!/^[A-Za-zÀ-ỹ]/.test(fullName)) err.fullName = "Full name phải bắt đầu bằng chữ cái.";
+
     if (!form.email.trim()) err.email = "Email is required.";
     else if (!validateEmail(form.email)) err.email = "Invalid email format.";
     if (!form.phone.trim()) err.phone = "Phone number is required.";
@@ -185,4 +195,4 @@ export default function RegisterForm() {
       </div>
     </form>
   );
-} 
+}

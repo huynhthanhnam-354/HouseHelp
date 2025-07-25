@@ -15,8 +15,29 @@ export default function RegisterCustomerForm() {
   });
 
   const handleChange = (field, value) => setForm(f => ({ ...f, [field]: value }));
+
+  function validateFullName(name) {
+    // Loại bỏ khoảng trắng đầu/cuối
+    const trimmed = name.trim();
+
+    // Không chứa số hoặc ký tự đặc biệt
+    if (!/^[A-Za-zÀ-ỹ\s]+$/.test(trimmed)) return false;
+
+    // Có ít nhất 2 từ
+    if (trimmed.split(/\s+/).length < 2) return false;
+
+    // Bắt đầu bằng chữ cái
+    if (!/^[A-Za-zÀ-ỹ]/.test(trimmed)) return false;
+
+    return true;
+  }
+
   const handleSubmit = e => {
     e.preventDefault();
+    if (!validateFullName(form.fullName)) {
+      alert("Họ tên chỉ được nhập chữ cái và khoảng trắng, không chứa số hoặc ký tự đặc biệt.");
+      return;
+    }
     // TODO: Xử lý đăng ký
   };
 
@@ -39,4 +60,4 @@ export default function RegisterCustomerForm() {
       </div>
     </form>
   );
-} 
+}
