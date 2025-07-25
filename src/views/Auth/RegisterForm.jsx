@@ -179,9 +179,9 @@ export default function RegisterForm() {
             </div>
           </div>
           {errors.services && <div className="form-error">{errors.services}</div>}
-          <UploadBox label="ID Card (Front)" file={form.idFront} onChange={f => handleChange("idFront", f)} />
+          {/* <UploadBox label="ID Card (Front)" file={form.idFront} onChange={f => handleChange("idFront", f)} /> */}
           {errors.idFront && <div className="form-error">{errors.idFront}</div>}
-          <UploadBox label="ID Card (Back)" file={form.idBack} onChange={f => handleChange("idBack", f)} />
+          {/* <UploadBox label="ID Card (Back)" file={form.idBack} onChange={f => handleChange("idBack", f)} /> */}
           {errors.idBack && <div className="form-error">{errors.idBack}</div>}
         </>
       )}

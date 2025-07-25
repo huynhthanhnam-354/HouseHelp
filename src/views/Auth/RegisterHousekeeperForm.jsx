@@ -3,7 +3,7 @@ import Input from "../Common/Input";
 import Button from "../Common/Button";
 import Checkbox from "../Common/Checkbox";
 import GoogleAuthButton from "../Common/GoogleAuthButton";
-import UploadBox from "../Common/UploadBox";
+// import UploadBox from "../Common/UploadBox";
 
 export default function RegisterHousekeeperForm() {
   const [form, setForm] = useState({
@@ -33,8 +33,8 @@ export default function RegisterHousekeeperForm() {
       <Input label="Password" type="password" value={form.password} onChange={v => handleChange("password", v)} placeholder="Create a password" required />
       <Input label="Confirm Password" type="password" value={form.confirmPassword} onChange={v => handleChange("confirmPassword", v)} placeholder="Confirm your password" required />
       <Input label="Role" value="Housekeeper" disabled />
-      <UploadBox label="ID Card (Front)" file={form.idFront} onChange={f => handleChange("idFront", f)} />
-      <UploadBox label="ID Card (Back)" file={form.idBack} onChange={f => handleChange("idBack", f)} />
+      {/* <UploadBox label="ID Card (Front)" file={form.idFront} onChange={f => handleChange("idFront", f)} /> */}
+      {/* <UploadBox label="ID Card (Back)" file={form.idBack} onChange={f => handleChange("idBack", f)} /> */}
       <Checkbox label={<span>I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></span>} checked={form.agree} onChange={v => handleChange("agree", v)} required />
       <Button type="submit" fullWidth>Create Account</Button>
       <div className="divider">Or continue with</div>
@@ -44,4 +44,4 @@ export default function RegisterHousekeeperForm() {
       </div>
     </form>
   );
-} 
+}

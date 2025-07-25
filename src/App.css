@@ -277,6 +277,8 @@ body, html {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.3s;
+  color: #222;
+  font-weight: bold;
 }
 
 .service-checkbox:hover {
