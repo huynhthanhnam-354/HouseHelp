@@ -3,28 +3,9 @@ import FilterSidebar from "./Housekeeper/FilterSidebar";
 import HousekeeperList from "./Housekeeper/HousekeeperList";
 import QuickInfo from "./Housekeeper/QuickInfo";
 import SpecialOffer from "./Housekeeper/SpecialOffer";
-import { useNavigate } from "react-router-dom";
+import Header from "./Header";
 
-function Header() {
-  const navigate = useNavigate();
-  const handleLogin = () => navigate("/login");
-  const handleRegister = () => navigate("/register");
-  return (
-    <header className="main-header">
-      <div className="header-left">
-        <span className="logo-text">HouseHelp</span>
-      </div>
-      <div className="header-center">
-        <input className="search-input" placeholder="Search for housekeepers, services, or locations..." />
-        <button className="search-btn">Search</button>
-      </div>
-      <div className="header-right">
-        <button className="header-login" onClick={handleLogin}>Login</button>
-        <button className="header-register" onClick={handleRegister}>Register</button>
-      </div>
-    </header>
-  );
-}
+// ...existing code...
 
 function Footer() {
   return (
@@ -68,10 +49,20 @@ function Footer() {
 
 export default function HomePageView() {
   const [filter, setFilter] = useState({});
-  
+  const [keyword, setKeyword] = useState("");
+
+  // Xử lý sự kiện tìm kiếm
+  const handleSearch = () => {
+    setFilter({ ...filter, keyword });
+  };
+
   return (
     <div className="home-root">
-      <Header />
+      <Header
+        keyword={keyword}
+        setKeyword={setKeyword}
+        onSearch={handleSearch}
+      />
       <div className="home-layout">
         <aside className="sidebar">
           <FilterSidebar onFilterChange={setFilter} />

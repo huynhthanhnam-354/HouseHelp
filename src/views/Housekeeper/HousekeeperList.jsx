@@ -12,28 +12,59 @@ function buildQuery(filter) {
 
 export default function HousekeeperList({ filter }) {
   const [housekeepers, setHousekeepers] = useState([]);
+  // useEffect(() => {
+  //   const query = buildQuery(filter || {});
+  //   fetch(`http://localhost:5000/api/housekeepers${query}`)
+  //     .then(res => res.json())
+  //     .then(data => setHousekeepers(data));
+  // }, [filter]);
   useEffect(() => {
-    const query = buildQuery(filter || {});
-    fetch(`http://localhost:5000/api/housekeepers${query}`)
-      .then(res => res.json())
-      .then(data => setHousekeepers(data));
-  }, [filter]);
+  const query = buildQuery(filter || {});
+  fetch(`http://localhost:5000/api/housekeepers${query}`)
+    .then(res => res.json())
+    .then(data => {
+      console.log("Dữ liệu trả về từ API:", data); // Dòng này giúp bạn kiểm tra dữ liệu
+      setHousekeepers(data);
+      console.log("Chi tiết từng housekeeper:", data);
+    });
+}, [filter]);
+
+  // Lọc theo từ khóa nếu có
+  let filteredHousekeepers = housekeepers;
+  if (filter && filter.keyword && filter.keyword.trim() !== "") {
+    const keyword = filter.keyword.trim().toLowerCase();
+    filteredHousekeepers = housekeepers.filter(hk => {
+      const services = hk.services ? hk.services.toLowerCase() : "";
+      const name = hk.name ? hk.name.toLowerCase() : "";
+      return services.includes(keyword) || name.includes(keyword);
+    });
+  }
 
   // Tạo mảng đủ 3 phần tử, thêm placeholder nếu thiếu
   const displayList = [
-    ...housekeepers,
-    ...Array(Math.max(0, 3 - housekeepers.length)).fill({ placeholder: true })
+    ...filteredHousekeepers,
+    ...Array(Math.max(0, 3 - filteredHousekeepers.length)).fill({ placeholder: true })
   ];
 
+  // ...existing code...
+  
   return (
     <div className="housekeeper-list">
-      {displayList.map((hk, idx) =>
-        hk.placeholder ? (
-          <div className="housekeeper-card placeholder" key={"placeholder-" + idx}></div>
-        ) : (
-          <HousekeeperCard key={hk.id} hk={hk} />
+      {filteredHousekeepers.length === 0 ? (
+        <div style={{textAlign: "center", color: "#999", marginTop: "32px"}}>
+          Không tìm thấy kết quả phù hợp.
+        </div>
+      ) : (
+        displayList.map((hk, idx) =>
+          hk.placeholder ? (
+            <div className="housekeeper-card placeholder" key={"placeholder-" + idx}></div>
+          ) : (
+            <HousekeeperCard key={hk.id} hk={hk} />
+          )
         )
       )}
     </div>
   );
-} 
+  
+  // ...existing code...
+}
