@@ -236,26 +236,18 @@ app.get('/api/filters/services', (req, res) => {
   });
 });
 
-// API: Filter - Ratings (tính từ bảng reviews)
+// API: Filter - Ratings (trả về tất cả các lựa chọn từ 1-5 sao)
 app.get('/api/filters/ratings', (req, res) => {
-  const sql = `
-    SELECT DISTINCT FLOOR(AVG(r.rating)) AS min_rating 
-    FROM housekeepers h
-    LEFT JOIN reviews r ON h.id = r.housekeeperId
-    WHERE r.rating IS NOT NULL
-    GROUP BY h.id
-    HAVING min_rating > 0
-    ORDER BY min_rating DESC
-  `;
-  db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ error: err });
-    const ratings = results.map(r => r.min_rating).filter((v, i, a) => a.indexOf(v) === i);
-    // Thêm rating 5+ nếu có housekeeper có rating >= 5
-    if (ratings.includes(5)) {
-      ratings.unshift(5);
-    }
-    res.json(ratings);
-  });
+  // Trả về tất cả các lựa chọn rating từ 1-5 sao, bao gồm "Any rating"
+  const ratings = [
+    { value: null, label: "Any rating", stars: 5 },
+    { value: 5, label: "5+ stars", stars: 5 },
+    { value: 4, label: "4+ stars", stars: 4 },
+    { value: 3, label: "3+ stars", stars: 3 },
+    { value: 2, label: "2+ stars", stars: 2 },
+    { value: 1, label: "1+ stars", stars: 1 }
+  ];
+  res.json(ratings);
 });
 
 // API: Filter - Price Range

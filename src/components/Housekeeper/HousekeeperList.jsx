@@ -19,18 +19,35 @@ export default function HousekeeperList({ filter }) {
       .then(data => setHousekeepers(data));
   }, [filter]);
 
+  // Lọc theo từ khóa nếu có
+  let filteredHousekeepers = housekeepers;
+  if (filter && filter.keyword && filter.keyword.trim() !== "") {
+    const keyword = filter.keyword.trim().toLowerCase();
+    filteredHousekeepers = housekeepers.filter(hk => {
+      const services = hk.services ? hk.services.toLowerCase() : "";
+      const fullName = hk.fullName ? hk.fullName.toLowerCase() : "";
+      return services.includes(keyword) || fullName.includes(keyword);
+    });
+  }
+
   const displayList = [
-    ...housekeepers,
-    ...Array(Math.max(0, 3 - housekeepers.length)).fill({ placeholder: true })
+    ...filteredHousekeepers,
+    ...Array(Math.max(0, 3 - filteredHousekeepers.length)).fill({ placeholder: true })
   ];
 
   return (
     <div className="housekeeper-list">
-      {displayList.map((hk, idx) =>
-        hk.placeholder ? (
-          <div className="housekeeper-card placeholder" key={"placeholder-" + idx}></div>
-        ) : (
-          <HousekeeperCard key={hk.id} hk={hk} />
+      {filteredHousekeepers.length === 0 ? (
+        <div style={{textAlign: "center", color: "#999", marginTop: "32px"}}>
+          Không tìm thấy kết quả phù hợp.
+        </div>
+      ) : (
+        displayList.map((hk, idx) =>
+          hk.placeholder ? (
+            <div className="housekeeper-card placeholder" key={"placeholder-" + idx}></div>
+          ) : (
+            <HousekeeperCard key={hk.id} hk={hk} />
+          )
         )
       )}
     </div>

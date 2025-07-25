@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import FilterSidebar from "./Housekeeper/FilterSidebar";
 import HousekeeperList from "./Housekeeper/HousekeeperList";
 import QuickInfo from "./Housekeeper/QuickInfo";
@@ -55,6 +55,17 @@ export default function HomePageView() {
   const handleSearch = () => {
     setFilter({ ...filter, keyword });
   };
+
+  // Tự động reload đề xuất khi người dùng xóa hết text trong search box
+  useEffect(() => {
+    if (keyword === "") {
+      // Xóa keyword khỏi filter để reload lại các đề xuất ban đầu
+      setFilter(prevFilter => {
+        const { keyword: _, ...restFilter } = prevFilter;
+        return restFilter;
+      });
+    }
+  }, [keyword]);
 
   return (
     <div className="home-root">

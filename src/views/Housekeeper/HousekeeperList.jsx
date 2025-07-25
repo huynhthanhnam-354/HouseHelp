@@ -35,8 +35,8 @@ export default function HousekeeperList({ filter }) {
     const keyword = filter.keyword.trim().toLowerCase();
     filteredHousekeepers = housekeepers.filter(hk => {
       const services = hk.services ? hk.services.toLowerCase() : "";
-      const name = hk.name ? hk.name.toLowerCase() : "";
-      return services.includes(keyword) || name.includes(keyword);
+      const fullName = hk.fullName ? hk.fullName.toLowerCase() : "";
+      return services.includes(keyword) || fullName.includes(keyword);
     });
   }
 
