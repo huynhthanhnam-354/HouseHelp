@@ -30,10 +30,8 @@ export default function HousekeeperList({ filter }) {
     });
   }
 
-  const displayList = [
-    ...filteredHousekeepers,
-    ...Array(Math.max(0, 3 - filteredHousekeepers.length)).fill({ placeholder: true })
-  ];
+  // Hiển thị tất cả housekeepers (không giới hạn 3 cards)
+  const displayList = filteredHousekeepers;
 
   return (
     <div className="housekeeper-list">
@@ -42,13 +40,9 @@ export default function HousekeeperList({ filter }) {
           Không tìm thấy kết quả phù hợp.
         </div>
       ) : (
-        displayList.map((hk, idx) =>
-          hk.placeholder ? (
-            <div className="housekeeper-card placeholder" key={"placeholder-" + idx}></div>
-          ) : (
-            <HousekeeperCard key={hk.id} hk={hk} />
-          )
-        )
+        displayList.map((hk) => (
+          <HousekeeperCard key={hk.id} hk={hk} />
+        ))
       )}
     </div>
   );
