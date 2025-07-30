@@ -5,7 +5,7 @@ import Button from "../Common/Button";
 import Checkbox from "../Common/Checkbox";
 import GoogleAuthButton from "../Common/GoogleAuthButton";
 import { login as loginApi } from "../../api/userApi";
-import useAuth from "../../hooks/useAuth";
+import { useAuth } from "../../hooks/useAuth";
 
 function validateEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

@@ -5,7 +5,9 @@ const mysql = require('mysql2');
 
 const app = express();
 app.use(cors());
-app.use(bodyParser.json());
+// Increase payload limit for base64 images
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Kết nối MySQL
 const db = mysql.createConnection({
@@ -180,6 +182,130 @@ app.get('/api/users/:id', (req, res) => {
     if (err) return res.status(500).json({ error: err });
     if (results.length === 0) return res.status(404).json({ error: 'User not found' });
     res.json(results[0]);
+  });
+});
+
+// API: Lấy profile đầy đủ của user
+app.get('/api/users/:id/profile', (req, res) => {
+  db.query('SELECT * FROM users WHERE id = ?', [req.params.id], (err, results) => {
+    if (err) return res.status(500).json({ error: err });
+    if (results.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(results[0]);
+  });
+});
+
+// API: Cập nhật profile user
+app.put('/api/users/:id/profile', (req, res) => {
+  const userId = req.params.id;
+  const {
+    fullName, phone, dateOfBirth, gender, address, city, district,
+    bio, languages, emergencyContact, emergencyContactName, avatar,
+    idCardFront, idCardBack
+  } = req.body;
+
+  console.log('=== UPDATE USER PROFILE ===');
+  console.log('User ID:', userId);
+  console.log('Request Body:', req.body);
+
+  const sql = `
+    UPDATE users SET 
+      fullName = ?, phone = ?, dateOfBirth = ?, gender = ?, address = ?, 
+      city = ?, district = ?, bio = ?, languages = ?, emergencyContact = ?, 
+      emergencyContactName = ?, avatar = ?, idCardFront = ?, idCardBack = ?, 
+      updatedAt = NOW()
+    WHERE id = ?
+  `;
+
+  const params = [
+    fullName, phone, dateOfBirth, gender, address, city, district,
+    bio, languages, emergencyContact, emergencyContactName, avatar,
+    idCardFront, idCardBack, userId
+  ];
+
+  console.log('SQL:', sql);
+  console.log('Params:', params);
+
+  db.query(sql, params, (err, result) => {
+    if (err) {
+      console.error('SQL Error:', err);
+      return res.status(500).json({ error: err });
+    }
+    
+    console.log('Update Result:', result);
+    console.log('Affected Rows:', result.affectedRows);
+    
+    if (result.affectedRows === 0) {
+      console.log('No rows affected - User not found');
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Trả về thông tin user đã cập nhật
+    db.query('SELECT * FROM users WHERE id = ?', [userId], (err, results) => {
+      if (err) {
+        console.error('Select Error:', err);
+        return res.status(500).json({ error: err });
+      }
+      console.log('Updated User:', results[0]);
+      res.json(results[0]);
+    });
+  });
+});
+
+// API: Lấy profile housekeeper
+app.get('/api/housekeepers/:userId/profile', (req, res) => {
+  const userId = req.params.userId;
+  
+  const sql = `
+    SELECT h.*, u.fullName, u.email, u.phone, u.avatar
+    FROM housekeepers h
+    JOIN users u ON h.userId = u.id
+    WHERE h.userId = ?
+  `;
+  
+  db.query(sql, [userId], (err, results) => {
+    if (err) return res.status(500).json({ error: err });
+    if (results.length === 0) return res.status(404).json({ error: 'Housekeeper not found' });
+    res.json(results[0]);
+  });
+});
+
+// API: Cập nhật profile housekeeper
+app.put('/api/housekeepers/:userId/profile', (req, res) => {
+  const userId = req.params.userId;
+  const {
+    description, experience, price, priceType, workingHours, 
+    serviceRadius, services, available
+  } = req.body;
+
+  const sql = `
+    UPDATE housekeepers SET 
+      description = ?, experience = ?, price = ?, priceType = ?, 
+      workingHours = ?, serviceRadius = ?, services = ?, available = ?,
+      updatedAt = NOW()
+    WHERE userId = ?
+  `;
+
+  const params = [
+    description, experience, price, priceType, workingHours,
+    serviceRadius, services, available, userId
+  ];
+
+  db.query(sql, params, (err, result) => {
+    if (err) return res.status(500).json({ error: err });
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Housekeeper not found' });
+    
+    // Trả về thông tin housekeeper đã cập nhật
+    const selectSql = `
+      SELECT h.*, u.fullName, u.email, u.phone, u.avatar
+      FROM housekeepers h
+      JOIN users u ON h.userId = u.id
+      WHERE h.userId = ?
+    `;
+    
+    db.query(selectSql, [userId], (err, results) => {
+      if (err) return res.status(500).json({ error: err });
+      res.json(results[0]);
+    });
   });
 });
 

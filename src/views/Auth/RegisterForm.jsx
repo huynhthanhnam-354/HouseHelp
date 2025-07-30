@@ -80,8 +80,9 @@ export default function RegisterForm() {
     else if (form.password !== form.confirmPassword) err.confirmPassword = "Passwords do not match.";
     if (!form.role) err.role = "Please select a role.";
     if (form.role === "housekeeper") {
-      if (!form.idFront) err.idFront = "ID Card (Front) is required.";
-      if (!form.idBack) err.idBack = "ID Card (Back) is required.";
+      // ID Card validation removed - will be handled in profile update
+      // if (!form.idFront) err.idFront = "ID Card (Front) is required.";
+      // if (!form.idBack) err.idBack = "ID Card (Back) is required.";
       if (!form.services.length) err.services = "Please select at least one service.";
     }
     if (!form.agree) err.agree = "You must agree to the terms.";

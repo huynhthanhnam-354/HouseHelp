@@ -81,6 +81,4 @@ export const useAuth = () => {
     checkAuthState,
     isCurrentlyAuthenticated
   };
-};
-
-export default useAuth; 
+}; 
