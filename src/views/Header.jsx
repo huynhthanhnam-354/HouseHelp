@@ -1,31 +1,35 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useLanguage } from "../contexts/LanguageContext";
+import translations from "../locales/translations";
 
 export default function Header({ keyword, setKeyword, onSearch }) {
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
-  
+
+  const { language } = useLanguage();
+  const t = translations[language];
+
   const handleLogin = () => navigate("/login");
   const handleRegister = () => navigate("/register");
   const handleLogout = () => {
     logout();
     setShowDropdown(false);
   };
-  
+
   const handleProfile = () => {
     navigate("/profile");
     setShowDropdown(false);
   };
-  
+
   const handleSettings = () => {
-    navigate("/settings");
+    navigate("/settings/language");
     setShowDropdown(false);
   };
-  
-  // Generate user initials
+
   const getUserInitials = (fullName) => {
     if (!fullName) return "U";
     return fullName
@@ -35,19 +39,18 @@ export default function Header({ keyword, setKeyword, onSearch }) {
       .toUpperCase()
       .slice(0, 2);
   };
-  
-  // Close dropdown when clicking outside
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  
+
   return (
     <header className="main-header">
       <div className="header-left">
@@ -56,12 +59,12 @@ export default function Header({ keyword, setKeyword, onSearch }) {
       <div className="header-center">
         <input
           className="search-input"
-          placeholder="Search for housekeepers, services, or locations..."
+          placeholder={t.searchPlaceholder}
           value={keyword}
           onChange={e => setKeyword(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") onSearch(); }}
         />
-        <button className="search-btn" onClick={onSearch}>Search</button>
+        <button className="search-btn" onClick={onSearch}>{t.search}</button>
       </div>
       <div className="header-right">
         {isAuthenticated ? (
@@ -83,30 +86,32 @@ export default function Header({ keyword, setKeyword, onSearch }) {
                   </div>
                   <div className="dropdown-user-info">
                     <div className="dropdown-name">{user?.fullName}</div>
-                    <div className="dropdown-role">{user?.role === 'housekeeper' ? 'Housekeeper' : 'Customer'}</div>
+                    <div className="dropdown-role">
+                      {user?.role === 'housekeeper' ? t.housekeeper : t.customer}
+                    </div>
                   </div>
                 </div>
                 <div className="dropdown-divider"></div>
                 <button className="dropdown-item" onClick={handleProfile}>
                   <span className="dropdown-icon">👤</span>
-                  Profile
+                  {t.profile}
                 </button>
                 <button className="dropdown-item" onClick={handleSettings}>
                   <span className="dropdown-icon">⚙️</span>
-                  Settings
+                  {t.settings}
                 </button>
                 <div className="dropdown-divider"></div>
                 <button className="dropdown-item logout" onClick={handleLogout}>
                   <span className="dropdown-icon">🚪</span>
-                  Logout
+                  {t.logout}
                 </button>
               </div>
             )}
           </div>
         ) : (
           <>
-            <button className="header-login" onClick={handleLogin}>Login</button>
-            <button className="header-register" onClick={handleRegister}>Register</button>
+            <button className="header-login" onClick={handleLogin}>{t.login || "Login"}</button>
+            <button className="header-register" onClick={handleRegister}>{t.register || "Register"}</button>
           </>
         )}
       </div>

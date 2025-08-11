@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { useLanguage } from "../../contexts/LanguageContext";
+import translations from "../../locales/translations";
 
 export default function FilterSidebar({ onFilterChange }) {
+  const { language } = useLanguage();
+  const t = translations[language];
+
   const [services, setServices] = useState([]);
   const [ratings, setRatings] = useState([]);
   const [priceRange, setPriceRange] = useState({ min_price: 0, max_price: 100 });
@@ -12,7 +17,7 @@ export default function FilterSidebar({ onFilterChange }) {
     maxPrice: null,
     available: null,
   });
-  
+
   // Generate unique ID for this component instance
   const [componentId] = useState(() => Date.now() + Math.random());
 
@@ -42,9 +47,9 @@ export default function FilterSidebar({ onFilterChange }) {
 
   return (
     <div className="filter-sidebar">
-      <h3>Filters</h3>
+      <h3>{t.filters || "Filters"}</h3>
       <div className="filter-section">
-        <div className="filter-label">Services</div>
+        <div className="filter-label">{t.services || "Services"}</div>
         <div className="filter-services-list">
           {services.map((s, idx) => (
             <label className="filter-service-tag" key={`service-${componentId}-${idx}`}>
@@ -54,26 +59,30 @@ export default function FilterSidebar({ onFilterChange }) {
         </div>
       </div>
       <div className="filter-section">
-        <div className="filter-label">Minimum Rating</div>
+        <div className="filter-label">{t.minimumRating || "Minimum Rating"}</div>
         <div className="filter-rating-list">
           {ratings.map((r, idx) => (
             <label className="filter-rating-tag" key={`rating-${componentId}-${idx}`}>
               <input type="radio" name={`minRating-${componentId}`} checked={filter.minRating === r.value} onChange={() => handleRating(r)} />
               <span className="filter-stars">{"★".repeat(r.stars)}<span className="filter-stars-empty">{"☆".repeat(5 - r.stars)}</span></span>
-              {r.label}
+              {r.label === "Any rating" ? t.anyRating : `${r.stars}+ ${t.stars}`}
             </label>
           ))}
         </div>
       </div>
       <div className="filter-section">
-        <div className="filter-label">Price Range (${priceRange.min_price} - ${priceRange.max_price})</div>
+        <div className="filter-label">
+          {t.priceRange || "Price Range"} (${priceRange.min_price} - ${priceRange.max_price})
+        </div>
         <input type="range" min={priceRange.min_price} max={priceRange.max_price} value={filter.maxPrice || priceRange.max_price} onChange={handlePrice} className="filter-slider" />
       </div>
       <div className="filter-section">
-        <div className="filter-label">Availability</div>
-        <label className="filter-checkbox"><input type="checkbox" checked={!!filter.available} onChange={handleAvailable} /> Available today</label>
+        <div className="filter-label">{t.availability || "Availability"}</div>
+        <label className="filter-checkbox">
+          <input type="checkbox" checked={!!filter.available} onChange={handleAvailable} /> {t.availableToday || "Available today"}
+        </label>
       </div>
-      <button className="btn clear-filters" onClick={handleClear}>Clear All Filters</button>
+      <button className="btn clear-filters" onClick={handleClear}>{t.clearAllFilters || "Clear All Filters"}</button>
     </div>
   );
-} 
+}

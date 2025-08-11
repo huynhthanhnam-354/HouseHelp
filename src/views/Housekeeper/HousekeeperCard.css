@@ -1,0 +1,139 @@
+.housekeeper-card-new {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 24px #e5e7eb;
+  padding: 28px 28px 22px 28px;
+  margin: 18px 0;
+  min-width: 320px;
+  max-width: 370px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  transition: box-shadow 0.2s;
+}
+
+.housekeeper-card-new:hover {
+  box-shadow: 0 8px 32px #dbeafe;
+}
+
+.hk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.hk-avatar-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.hk-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 2px;
+}
+
+.hk-basic-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hk-name {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 2px;
+}
+
+.hk-rating-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.98rem;
+  color: #888;
+}
+
+.hk-rating-text {
+  font-size: 0.97rem;
+  color: #888;
+}
+
+.hk-availability {
+  color: #22c55e;
+  font-weight: 500;
+  font-size: 1rem;
+  margin-top: 2px;
+}
+
+.hk-price {
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: #2563eb;
+  margin-top: 2px;
+}
+
+.price-unit {
+  font-size: 0.95rem;
+  color: #888;
+  font-weight: 400;
+  margin-left: 2px;
+}
+
+.hk-services-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 18px 0;
+}
+
+.hk-service-tag {
+  background: #e7f0fd;
+  color: #2563eb;
+  border-radius: 16px;
+  padding: 6px 16px;
+  font-size: 0.98rem;
+  font-weight: 500;
+  margin-bottom: 2px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.hk-service-tag:hover {
+  background: #2563eb;
+  color: #fff;
+}
+
+.hk-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.hk-book-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 13px 0;
+  width: 100%;
+  font-size: 1.08rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-shadow: 0 2px 8px #e0e7ef;
+}
+
+.hk-book-btn:hover {
+  background: #174bbd;
+}
