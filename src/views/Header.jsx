@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../contexts/LanguageContext";
 import translations from "../locales/translations";
+import NotificationBell from "../components/NotificationBell";
 
 export default function Header({ keyword, setKeyword, onSearch }) {
   const navigate = useNavigate();
@@ -69,6 +70,7 @@ export default function Header({ keyword, setKeyword, onSearch }) {
       <div className="header-right">
         {isAuthenticated ? (
           <div className="header-user-section" ref={dropdownRef}>
+            <NotificationBell />
             <div 
               className="header-avatar" 
               title={user?.fullName}
@@ -96,6 +98,18 @@ export default function Header({ keyword, setKeyword, onSearch }) {
                   <span className="dropdown-icon">👤</span>
                   {t.profile}
                 </button>
+                {user?.role === 'housekeeper' && (
+                  <button className="dropdown-item" onClick={() => { navigate("/housekeeper/dashboard"); setShowDropdown(false); }}>
+                    <span className="dropdown-icon">📋</span>
+                    Dashboard
+                  </button>
+                )}
+                {user?.role === 'customer' && (
+                  <button className="dropdown-item" onClick={() => { navigate("/customer/dashboard"); setShowDropdown(false); }}>
+                    <span className="dropdown-icon">📋</span>
+                    Dashboard
+                  </button>
+                )}
                 <button className="dropdown-item" onClick={handleSettings}>
                   <span className="dropdown-icon">⚙️</span>
                   {t.settings}

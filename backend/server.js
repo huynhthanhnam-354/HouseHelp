@@ -2,8 +2,18 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
+const http = require('http');
+const socketIo = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"]
+  }
+});
+
 app.use(cors());
 // Increase payload limit for base64 images
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -112,6 +122,52 @@ app.get('/api/housekeepers', (req, res) => {
       res.json(housekeepersWithInitials);
     });
   }
+});
+
+// API: Lấy thông tin housekeeper theo ID
+app.get('/api/housekeepers/:id', (req, res) => {
+  const housekeeperId = req.params.id;
+  
+  let sql = `
+    SELECT h.*, u.fullName, u.email, u.phone,
+           COALESCE(AVG(r.rating), 0) as avgRating,
+           COUNT(r.id) as reviewCount
+    FROM housekeepers h
+    JOIN users u ON h.userId = u.id
+    LEFT JOIN reviews r ON h.id = r.housekeeperId
+    WHERE h.id = ? OR h.userId = ?
+    GROUP BY h.id, h.userId, h.services, h.price, h.available, h.description, u.fullName, u.email, u.phone
+  `;
+  
+  db.query(sql, [housekeeperId, housekeeperId], (err, results) => {
+    if (err) {
+      console.log('SQL Error:', err);
+      return res.status(500).json({ error: err });
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Housekeeper not found' });
+    }
+    
+    const hk = results[0];
+    const initials = hk.fullName.split(' ').map(n => n[0]).join('').toUpperCase();
+    const housekeeperWithDetails = {
+      ...hk,
+      initials: initials,
+      rating: parseFloat(hk.avgRating).toFixed(1),
+      reviewCount: hk.reviewCount,
+      avatar: initials,
+      experience: hk.description || "Professional housekeeper",
+      backgroundChecked: true,
+      insured: true,
+      location: hk.address || "Location not specified",
+      bio: hk.description || "Professional housekeeper with experience.",
+      phoneNumber: hk.phone,
+      availability: hk.available ? "Available today" : "Not available"
+    };
+    
+    res.json(housekeeperWithDetails);
+  });
 });
 
 // API: Đăng ký user mới
@@ -311,11 +367,232 @@ app.put('/api/housekeepers/:userId/profile', (req, res) => {
 
 // API: Đặt lịch
 app.post('/api/bookings', (req, res) => {
-  const { customerId, housekeeperId, service, date, status, price } = req.body;
-  const sql = 'INSERT INTO bookings (customerId, housekeeperId, service, date, status, price) VALUES (?, ?, ?, ?, ?, ?)';
-  db.query(sql, [customerId, housekeeperId, service, date, status, price], (err, result) => {
-    if (err) return res.status(500).json({ error: err });
-    res.json({ id: result.insertId, customerId, housekeeperId, service, date, status, price });
+  const { 
+    customerId, 
+    housekeeperId, 
+    service, 
+    date, 
+    time,
+    duration,
+    location,
+    notes,
+    totalPrice,
+    customerName,
+    customerEmail,
+    customerPhone,
+    housekeeperName
+  } = req.body;
+  
+  const bookingData = {
+    customerId,
+    housekeeperId,
+    service,
+    date,
+    time,
+    duration,
+    location,
+    notes,
+    status: 'pending',
+    totalPrice,
+    customerName,
+    customerEmail,
+    customerPhone,
+    housekeeperName,
+    createdAt: new Date()
+  };
+
+  const sql = `INSERT INTO bookings 
+    (customerId, housekeeperId, service, date, time, duration, location, notes, status, totalPrice, customerName, customerEmail, customerPhone, housekeeperName, createdAt) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    
+  const values = [
+    customerId, housekeeperId, service, date, time, duration, location, notes, 
+    'pending', totalPrice, customerName, customerEmail, customerPhone, housekeeperName, new Date()
+  ];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Error creating booking:', err);
+      return res.status(500).json({ error: err });
+    }
+
+    const bookingId = result.insertId;
+    const newBooking = { ...bookingData, id: bookingId };
+
+    // Send notification to housekeeper
+    const notificationToHousekeeper = {
+      id: Date.now(),
+      type: 'new_booking',
+      title: 'Đơn đặt lịch mới',
+      message: `${customerName} đã đặt lịch dịch vụ ${service}`,
+      bookingId: bookingId,
+      booking: newBooking,
+      timestamp: new Date(),
+      read: false
+    };
+
+    // Get housekeeper's userId from housekeeperId
+    db.query('SELECT userId FROM housekeepers WHERE id = ?', [housekeeperId], (err, hkResults) => {
+      if (!err && hkResults.length > 0) {
+        const housekeeperUserId = hkResults[0].userId;
+        sendNotificationToUser(housekeeperUserId, notificationToHousekeeper);
+        
+        // Save notification to database
+        const notifSql = `INSERT INTO notifications (userId, type, title, message, bookingId, data, createdAt, read_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        db.query(notifSql, [
+          housekeeperUserId, 
+          notificationToHousekeeper.type,
+          notificationToHousekeeper.title,
+          notificationToHousekeeper.message,
+          bookingId,
+          JSON.stringify(newBooking),
+          new Date(),
+          0
+        ], (notifErr) => {
+          if (notifErr) console.error('Error saving notification:', notifErr);
+        });
+      }
+    });
+
+    res.json(newBooking);
+  });
+});
+
+// API: Housekeeper xác nhận booking
+app.post('/api/bookings/:id/confirm', (req, res) => {
+  const bookingId = req.params.id;
+  
+  // Update booking status to confirmed
+  db.query('UPDATE bookings SET status = ? WHERE id = ?', ['confirmed', bookingId], (err, result) => {
+    if (err) {
+      console.error('Error confirming booking:', err);
+      return res.status(500).json({ error: err });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Get booking details to send notification to customer
+    db.query('SELECT * FROM bookings WHERE id = ?', [bookingId], (err, bookingResults) => {
+      if (err || bookingResults.length === 0) {
+        return res.status(500).json({ error: 'Error fetching booking details' });
+      }
+
+      const booking = bookingResults[0];
+      
+      // Send notification to customer
+      const notificationToCustomer = {
+        id: Date.now(),
+        type: 'booking_confirmed',
+        title: 'Đặt lịch đã được xác nhận',
+        message: `${booking.housekeeperName} đã xác nhận đơn đặt lịch của bạn`,
+        bookingId: bookingId,
+        booking: booking,
+        timestamp: new Date(),
+        read: false
+      };
+
+      console.log('🎉 Sending confirmation notification to customer:', booking.customerId);
+      console.log('Notification data:', notificationToCustomer);
+      const sent = sendNotificationToUser(booking.customerId, notificationToCustomer);
+      console.log('Notification sent successfully:', sent);
+      
+      // Save notification to database
+      const notifSql = `INSERT INTO notifications (userId, type, title, message, bookingId, data, createdAt, read_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+      db.query(notifSql, [
+        booking.customerId,
+        notificationToCustomer.type,
+        notificationToCustomer.title,
+        notificationToCustomer.message,
+        bookingId,
+        JSON.stringify(booking),
+        new Date(),
+        0
+      ], (notifErr) => {
+        if (notifErr) console.error('Error saving notification:', notifErr);
+      });
+
+      res.json({ message: 'Booking confirmed successfully', booking: booking });
+    });
+  });
+});
+
+// API: Housekeeper từ chối booking
+app.post('/api/bookings/:id/reject', (req, res) => {
+  const bookingId = req.params.id;
+  
+  // Update booking status to rejected
+  db.query('UPDATE bookings SET status = ? WHERE id = ?', ['rejected', bookingId], (err, result) => {
+    if (err) {
+      console.error('Error rejecting booking:', err);
+      return res.status(500).json({ error: err });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Get booking details to send notification to customer
+    db.query('SELECT * FROM bookings WHERE id = ?', [bookingId], (err, bookingResults) => {
+      if (err || bookingResults.length === 0) {
+        return res.status(500).json({ error: 'Error fetching booking details' });
+      }
+
+      const booking = bookingResults[0];
+      
+      // Send notification to customer
+      const notificationToCustomer = {
+        id: Date.now(),
+        type: 'booking_rejected',
+        title: 'Đặt lịch đã bị từ chối',
+        message: `${booking.housekeeperName} đã từ chối đơn đặt lịch của bạn`,
+        bookingId: bookingId,
+        booking: booking,
+        timestamp: new Date(),
+        read: false
+      };
+
+      console.log('❌ Sending rejection notification to customer:', booking.customerId);
+      console.log('Notification data:', notificationToCustomer);
+      const sent = sendNotificationToUser(booking.customerId, notificationToCustomer);
+      console.log('Notification sent successfully:', sent);
+      
+      // Save notification to database
+      const notifSql = `INSERT INTO notifications (userId, type, title, message, bookingId, data, createdAt, read_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+      db.query(notifSql, [
+        booking.customerId,
+        notificationToCustomer.type,
+        notificationToCustomer.title,
+        notificationToCustomer.message,
+        bookingId,
+        JSON.stringify(booking),
+        new Date(),
+        0
+      ], (notifErr) => {
+        if (notifErr) console.error('Error saving notification:', notifErr);
+      });
+
+      res.json({ message: 'Booking rejected successfully', booking: booking });
+    });
+  });
+});
+
+// API: Kiểm tra status của booking
+app.get('/api/bookings/:id/status', (req, res) => {
+  const bookingId = req.params.id;
+  
+  db.query('SELECT id, status FROM bookings WHERE id = ?', [bookingId], (err, results) => {
+    if (err) {
+      console.error('Error fetching booking status:', err);
+      return res.status(500).json({ error: err });
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    res.json(results[0]);
   });
 });
 
@@ -392,4 +669,290 @@ app.get('/api/filters/availability', (req, res) => {
   });
 });
 
-app.listen(5000, () => console.log('Server running on port 5000'));
+// API: Lấy notifications của user
+app.get('/api/notifications/:userId', (req, res) => {
+  const userId = req.params.userId;
+  
+  db.query(
+    'SELECT * FROM notifications WHERE userId = ? ORDER BY createdAt DESC LIMIT 50',
+    [userId],
+    (err, results) => {
+      if (err) {
+        console.error('Error fetching notifications:', err);
+        return res.status(500).json({ error: err });
+      }
+      
+      const notifications = results.map(notif => ({
+        ...notif,
+        data: notif.data ? JSON.parse(notif.data) : null,
+        read: notif.read_status === 1
+      }));
+      
+      res.json(notifications);
+    }
+  );
+});
+
+// API: Tạo notification mới
+app.post('/api/notifications', (req, res) => {
+  const { userId, type, title, message, bookingId, data } = req.body;
+  
+  if (!userId || !type || !title || !message) {
+    return res.status(400).json({ error: 'Missing required fields: userId, type, title, message' });
+  }
+  
+  const sql = `INSERT INTO notifications (userId, type, title, message, bookingId, data, createdAt, read_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+  const values = [
+    userId,
+    type,
+    title,
+    message,
+    bookingId || null,
+    data ? JSON.stringify(data) : null,
+    new Date(),
+    0
+  ];
+  
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Error creating notification:', err);
+      return res.status(500).json({ error: err });
+    }
+    
+    const notificationId = result.insertId;
+    const newNotification = {
+      id: notificationId,
+      userId,
+      type,
+      title,
+      message,
+      bookingId,
+      data,
+      timestamp: new Date(),
+      read: false
+    };
+    
+    // Send notification via WebSocket
+    sendNotificationToUser(userId, newNotification);
+    
+    res.json({ message: 'Notification created successfully', notification: newNotification });
+  });
+});
+
+// API: Đánh dấu notification đã đọc
+app.put('/api/notifications/:id/read', (req, res) => {
+  const notificationId = req.params.id;
+  
+  db.query(
+    'UPDATE notifications SET read_status = 1 WHERE id = ?',
+    [notificationId],
+    (err, result) => {
+      if (err) {
+        console.error('Error marking notification as read:', err);
+        return res.status(500).json({ error: err });
+      }
+      
+      res.json({ message: 'Notification marked as read' });
+    }
+  );
+});
+
+// API: Xóa notification
+app.delete('/api/notifications/:id', (req, res) => {
+  const notificationId = req.params.id;
+  
+  db.query(
+    'DELETE FROM notifications WHERE id = ?',
+    [notificationId],
+    (err, result) => {
+      if (err) {
+        console.error('Error deleting notification:', err);
+        return res.status(500).json({ error: err });
+      }
+      
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Notification not found' });
+      }
+      
+      res.json({ message: 'Notification deleted successfully' });
+    }
+  );
+});
+
+// WebSocket connection handling
+const activeUsers = new Map(); // Store active user connections
+
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  // User joins with their ID and role
+  socket.on('join', ({ userId, role }) => {
+    // Store user with both string and number keys to handle type mismatches
+    const userIdStr = String(userId);
+    const userIdNum = parseInt(userId);
+    
+    const userInfo = { socketId: socket.id, role, userId: userId };
+    activeUsers.set(userId, userInfo);
+    activeUsers.set(userIdStr, userInfo);
+    activeUsers.set(userIdNum, userInfo);
+    
+    socket.userId = userId;
+    socket.role = role;
+    console.log(`✅ User ${userId} (${role}) joined. Active users: ${activeUsers.size}`);
+    console.log(`Stored user with keys:`, [userId, userIdStr, userIdNum]);
+  });
+
+  // Handle disconnect
+  socket.on('disconnect', () => {
+    if (socket.userId) {
+      const userIdStr = String(socket.userId);
+      const userIdNum = parseInt(socket.userId);
+      
+      activeUsers.delete(socket.userId);
+      activeUsers.delete(userIdStr);
+      activeUsers.delete(userIdNum);
+      
+      console.log(`User ${socket.userId} disconnected`);
+    }
+  });
+});
+
+// Helper function to send notification to specific user
+function sendNotificationToUser(userId, notification) {
+  console.log(`Trying to send notification to user ${userId}`, {
+    userIdType: typeof userId,
+    activeUsersKeys: Array.from(activeUsers.keys()),
+    activeUsersSize: activeUsers.size
+  });
+  
+  // Try both string and number versions of userId
+  const userIdStr = String(userId);
+  const userIdNum = parseInt(userId);
+  
+  let user = activeUsers.get(userId) || activeUsers.get(userIdStr) || activeUsers.get(userIdNum);
+  
+  if (user) {
+    io.to(user.socketId).emit('notification', notification);
+    console.log(`✅ Notification sent to user ${userId}:`, notification);
+    return true;
+  } else {
+    console.log(`❌ User ${userId} not found in active users. Available users:`, Array.from(activeUsers.keys()));
+    return false;
+  }
+}
+
+// API để debug active users
+app.get('/api/debug/active-users', (req, res) => {
+  const activeUsersList = Array.from(activeUsers.entries()).map(([key, value]) => ({
+    key: key,
+    keyType: typeof key,
+    value: value
+  }));
+  
+  res.json({
+    totalActiveUsers: activeUsers.size,
+    activeUsers: activeUsersList,
+    uniqueSocketIds: [...new Set(Array.from(activeUsers.values()).map(u => u.socketId))].length
+  });
+});
+
+// API để debug database structure
+app.get('/api/debug/db-structure', (req, res) => {
+  // Get columns of bookings table
+  db.query('DESCRIBE bookings', (err, bookingsColumns) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to get bookings structure: ' + err.message });
+    }
+    
+    // Get columns of users table
+    db.query('DESCRIBE users', (err2, usersColumns) => {
+      if (err2) {
+        return res.status(500).json({ error: 'Failed to get users structure: ' + err2.message });
+      }
+      
+      // Get sample booking data and notifications structure
+      db.query('SELECT * FROM bookings LIMIT 3', (err3, sampleBookings) => {
+        if (err3) {
+          return res.status(500).json({ error: 'Failed to get sample bookings: ' + err3.message });
+        }
+        
+        // Get notifications table structure
+        db.query('DESCRIBE notifications', (err4, notificationsColumns) => {
+          if (err4) {
+            return res.status(500).json({ 
+              bookingsStructure: bookingsColumns,
+              usersStructure: usersColumns,
+              sampleBookings: sampleBookings,
+              notificationsError: 'Failed to get notifications structure: ' + err4.message
+            });
+          }
+          
+          // Get recent notifications
+          db.query('SELECT * FROM notifications ORDER BY createdAt DESC LIMIT 5', (err5, recentNotifications) => {
+            res.json({
+              bookingsStructure: bookingsColumns,
+              usersStructure: usersColumns,
+              notificationsStructure: notificationsColumns,
+              sampleBookings: sampleBookings,
+              recentNotifications: recentNotifications || []
+            });
+          });
+        });
+      });
+    });
+  });
+});
+
+// API test để debug notification
+app.post('/api/test-notification', (req, res) => {
+  const { userId, message } = req.body;
+  
+  console.log(`🧪 Testing notification for user ${userId}`);
+  
+  const testNotification = {
+    id: Date.now(),
+    type: 'test',
+    title: 'Test Notification',
+    message: message || 'This is a test notification',
+    timestamp: new Date(),
+    read: false
+  };
+  
+  const sent = sendNotificationToUser(userId, testNotification);
+  
+  res.json({ 
+    success: sent, 
+    message: sent ? 'Notification sent' : 'User not connected',
+    activeUsers: Array.from(activeUsers.keys())
+  });
+});
+
+// API để fix customer ID trong booking
+app.put('/api/debug/fix-booking-customer/:bookingId', (req, res) => {
+  const { bookingId } = req.params;
+  const { newCustomerId } = req.body;
+  
+  console.log(`🔧 Fixing booking ${bookingId} customer ID to ${newCustomerId}`);
+  
+  const query = 'UPDATE bookings SET customerId = ? WHERE id = ?';
+  db.query(query, [newCustomerId, bookingId], (err, result) => {
+    if (err) {
+      console.error('Error updating booking customer ID:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    console.log(`✅ Updated booking ${bookingId} customer ID to ${newCustomerId}`);
+    res.json({ 
+      message: 'Booking customer ID updated successfully',
+      bookingId: bookingId,
+      newCustomerId: newCustomerId,
+      affectedRows: result.affectedRows
+    });
+  });
+});
+
+server.listen(5000, () => console.log('Server running on port 5000 with WebSocket support'));

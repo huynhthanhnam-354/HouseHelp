@@ -5,6 +5,9 @@ export async function getAllHousekeepers() {
 
 export async function getHousekeeperById(id) {
   const res = await fetch(`http://localhost:5000/api/housekeepers/${id}`);
+  if (!res.ok) {
+    throw new Error(`HTTP error! status: ${res.status}`);
+  }
   return res.json();
 }
 

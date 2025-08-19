@@ -48,7 +48,7 @@ function Footer() {
 }
 
 export default function HomePageView() {
-  const [filter, setFilter] = useState({});
+  const [filter, setFilter] = useState(null);
   const [keyword, setKeyword] = useState("");
 
   // Xử lý sự kiện tìm kiếm

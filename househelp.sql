@@ -174,3 +174,37 @@ TRUE, 156, 20, FALSE);
 INSERT INTO housekeeper_services (housekeeperId, serviceId) VALUES
 (1, 1), (1, 2), (1, 3), (1, 4),
 (2, 1), (2, 6);
+
+-- Update bookings table to add new columns for enhanced booking functionality
+ALTER TABLE bookings 
+ADD COLUMN IF NOT EXISTS time VARCHAR(10),
+ADD COLUMN IF NOT EXISTS duration INT DEFAULT 2,
+ADD COLUMN IF NOT EXISTS location TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+ADD COLUMN IF NOT EXISTS customerName VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+ADD COLUMN IF NOT EXISTS customerEmail VARCHAR(255),
+ADD COLUMN IF NOT EXISTS customerPhone VARCHAR(20),
+ADD COLUMN IF NOT EXISTS housekeeperName VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+ADD COLUMN IF NOT EXISTS service VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Rename existing columns to avoid conflicts
+ALTER TABLE bookings 
+CHANGE COLUMN startDate date DATE,
+CHANGE COLUMN totalPrice totalPrice DECIMAL(10,2);
+
+-- Create notifications table for real-time messaging system
+CREATE TABLE IF NOT EXISTS notifications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  userId INT NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  message TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  bookingId INT NULL,
+  data JSON NULL,
+  read_status TINYINT(1) DEFAULT 0,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_userId (userId),
+  INDEX idx_createdAt (createdAt),
+  INDEX idx_read_status (read_status),
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (bookingId) REFERENCES bookings(id) ON DELETE CASCADE
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

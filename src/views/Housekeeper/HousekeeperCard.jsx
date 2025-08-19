@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import RatingStars from "../Common/RatingStars";
 import Button from "../Common/Button";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useBooking } from "../../contexts/BookingContext";
 import translations from "../../locales/translations";
 import "./HousekeeperCard.css";
 
 export default function HousekeeperCard({ hk }) {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { setHousekeeper } = useBooking();
   const t = translations[language];
 
   const services = Array.isArray(hk.services)
@@ -30,10 +32,54 @@ export default function HousekeeperCard({ hk }) {
 
   const handleBookNow = () => {
     if (isAuthenticated()) {
-      alert(`Booking ${hk.fullName} - Feature coming soon!`);
+      console.log("Original housekeeper data:", hk);
+      
+      // Process housekeeper data and set it in booking context
+      const housekeeperId = hk.id || hk.housekeeperId; // Use real database ID only
+      console.log("Using housekeeper ID:", housekeeperId);
+      
+      if (!housekeeperId) {
+        console.error("No valid housekeeper ID found!");
+        alert("Lỗi: Không tìm thấy ID người giúp việc");
+        return;
+      }
+      
+      const processedHousekeeper = {
+        id: housekeeperId,
+        fullName: hk.fullName || hk.name || "Unknown Housekeeper",
+        rating: parseFloat(hk.rating) || 4.5,
+        reviewCount: parseInt(hk.reviewCount) || 0,
+        price: parseFloat(hk.price) || 25,
+        services: services,
+        avatar: hk.avatar || getInitials(hk.fullName || hk.name),
+        experience: hk.experience || "Professional housekeeper",
+        backgroundChecked: hk.backgroundChecked !== false,
+        insured: hk.insured !== false,
+        location: hk.location || hk.address || "Location not specified",
+        bio: hk.bio || hk.description || "Professional housekeeper with experience.",
+        phone: hk.phone || hk.phoneNumber || "+1 (555) 123-4567",
+        availability: hk.availability || "Available today"
+      };
+
+      // Set housekeeper in booking context
+      setHousekeeper(processedHousekeeper);
+      
+      // Navigate to booking detail page
+      navigate(`/booking/${processedHousekeeper.id}`);
     } else {
       navigate("/login");
     }
+  };
+
+  // Helper function to get initials from name
+  const getInitials = (name) => {
+    if (!name) return "HK";
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   return (
