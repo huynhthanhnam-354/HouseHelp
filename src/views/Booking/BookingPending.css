@@ -326,6 +326,30 @@
   font-size: 14px;
 }
 
+.confirmed-actions {
+  margin: 30px 0 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.home-btn-success {
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 30px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 200px;
+}
+
+.home-btn-success:hover {
+  background: #218838;
+  transform: translateY(-1px);
+}
+
 .redirect-message {
   color: #666;
   font-style: italic;
@@ -443,9 +467,14 @@
 
 .rejection-actions {
   margin: 30px 0 20px;
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
-.find-other-btn {
+.find-other-btn,
+.home-btn-rejected {
   background: #3498db;
   color: white;
   border: none;
@@ -455,10 +484,21 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex: 1;
+  min-width: 180px;
 }
 
 .find-other-btn:hover {
   background: #2980b9;
+  transform: translateY(-1px);
+}
+
+.home-btn-rejected {
+  background: #6c757d;
+}
+
+.home-btn-rejected:hover {
+  background: #5a6268;
   transform: translateY(-1px);
 }
 
@@ -486,6 +526,25 @@
   
   .rejection-suggestions {
     padding: 15px;
+  }
+  
+  .rejection-actions {
+    flex-direction: column;
+  }
+  
+  .find-other-btn,
+  .home-btn-rejected {
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .confirmed-actions {
+    margin: 20px 0;
+  }
+  
+  .home-btn-success {
+    min-width: auto;
+    width: 100%;
   }
 }
 

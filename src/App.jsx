@@ -11,9 +11,6 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import { BookingProvider } from "./contexts/BookingContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import ToastContainer from "./components/ToastContainer";
-import DebugNotification from "./components/DebugNotification";
-import TestNotification from "./components/TestNotification";
-import DebugBookingFlow from "./components/DebugBookingFlow";
 import './App.css';
 
 export default function App() {
@@ -35,9 +32,6 @@ export default function App() {
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
             <ToastContainer />
-            <DebugNotification />
-            <TestNotification />
-            <DebugBookingFlow />
           </NotificationProvider>
         </Router>
       </BookingProvider>

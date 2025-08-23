@@ -184,7 +184,23 @@ export default function BookingPending({ booking, housekeeper, onCancel }) {
             <p><strong>{t.location}:</strong> {booking?.location}</p>
             <p><strong>{t.bookingId || 'Mã đặt lịch'}:</strong> {booking?.id}</p>
           </div>
-          <p className="redirect-message">{t.redirectingHome || 'Đang chuyển về trang chủ trong 5 giây...'}</p>
+          
+          <div className="confirmed-actions">
+            <button 
+              className="home-btn-success"
+              onClick={() => {
+                localStorage.removeItem('bookingState');
+                if (resetBooking) {
+                  resetBooking();
+                }
+                window.location.href = '/';
+              }}
+            >
+              {t.backToHome || 'Về trang chủ'}
+            </button>
+          </div>
+          
+          <p className="redirect-message">{t.redirectingHome || 'Tự động chuyển về trang chủ trong 5 giây...'}</p>
         </div>
       </div>
     );
@@ -215,12 +231,30 @@ export default function BookingPending({ booking, housekeeper, onCancel }) {
           <div className="rejection-actions">
             <button 
               className="find-other-btn"
-              onClick={() => navigate('/')}
+              onClick={() => {
+                localStorage.removeItem('bookingState');
+                if (resetBooking) {
+                  resetBooking();
+                }
+                navigate('/');
+              }}
             >
               {t.findOtherHousekeeper || 'Tìm người giúp việc khác'}
             </button>
+            <button 
+              className="home-btn-rejected"
+              onClick={() => {
+                localStorage.removeItem('bookingState');
+                if (resetBooking) {
+                  resetBooking();
+                }
+                window.location.href = '/';
+              }}
+            >
+              {t.backToHome || 'Về trang chủ'}
+            </button>
           </div>
-          <p className="redirect-message">{t.redirectingHomeReject || 'Tự động chuyển về trang chủ trong 5 giây...'}</p>
+          <p className="redirect-message">{t.redirectingHomeReject || 'Tự động chuyển về trang chủ trong 3 giây...'}</p>
         </div>
       </div>
     );
