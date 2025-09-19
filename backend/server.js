@@ -402,7 +402,7 @@ app.post('/api/bookings', (req, res) => {
   };
 
   const sql = `INSERT INTO bookings 
-    (customerId, housekeeperId, service, date, time, duration, location, notes, status, totalPrice, customerName, customerEmail, customerPhone, housekeeperName, createdAt) 
+    (customerId, housekeeperId, service, startDate, time, duration, location, notes, status, totalPrice, customerName, customerEmail, customerPhone, housekeeperName, createdAt) 
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     
   const values = [
@@ -419,6 +419,13 @@ app.post('/api/bookings', (req, res) => {
     const bookingId = result.insertId;
     const newBooking = { ...bookingData, id: bookingId };
 
+    console.log('🎯 NEW BOOKING CREATED:');
+    console.log('- Booking ID:', bookingId);
+    console.log('- Customer ID:', customerId);
+    console.log('- Housekeeper ID:', housekeeperId);
+    console.log('- Customer Name:', customerName);
+    console.log('- Service:', service);
+
     // Send notification to housekeeper
     const notificationToHousekeeper = {
       id: Date.now(),
@@ -432,10 +439,17 @@ app.post('/api/bookings', (req, res) => {
     };
 
     // Get housekeeper's userId from housekeeperId
+    console.log('🔍 Looking up housekeeper userId for housekeeperId:', housekeeperId);
     db.query('SELECT userId FROM housekeepers WHERE id = ?', [housekeeperId], (err, hkResults) => {
+      console.log('📝 Housekeeper query results:', hkResults);
+      
       if (!err && hkResults.length > 0) {
         const housekeeperUserId = hkResults[0].userId;
-        sendNotificationToUser(housekeeperUserId, notificationToHousekeeper);
+        console.log('✅ Found housekeeper userId:', housekeeperUserId);
+        console.log('📤 Sending notification to userId:', housekeeperUserId);
+        
+        const sent = sendNotificationToUser(housekeeperUserId, notificationToHousekeeper);
+        console.log('📬 Notification sent result:', sent);
         
         // Save notification to database
         const notifSql = `INSERT INTO notifications (userId, type, title, message, bookingId, data, createdAt, read_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;

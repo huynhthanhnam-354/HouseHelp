@@ -11,7 +11,11 @@ export const NotificationProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
+    console.log('🔄 NotificationContext useEffect - isAuthenticated:', isAuthenticated, 'user:', user);
+    
     if (isAuthenticated && user) {
+      console.log('✅ Connecting to NotificationService with userId:', user.id, 'role:', user.role);
+      
       // Load notifications from localStorage first
       NotificationService.loadFromLocalStorage();
       

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useReducer, useEffect } from 'react';
-// import { useAuth } from './AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 const BookingContext = createContext();
 
@@ -106,7 +106,7 @@ const getDefaultState = () => ({
 const initialBookingState = loadInitialState();
 
 export const BookingProvider = ({ children }) => {
-  // const { user } = useAuth(); // Get current user
+  // const { user } = useAuth(); // Get current user - Comment out to avoid router dependency
   const [state, dispatch] = useReducer(bookingReducer, initialBookingState);
   const [bookingHistory, setBookingHistory] = useState([]);
 
@@ -222,7 +222,7 @@ export const BookingProvider = ({ children }) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            customerId: 4, // Fixed customer ID for testing
+            customerId: bookingData.customerId || 4, // Use provided customer ID or fallback
             housekeeperId: state.selectedHousekeeper?.id,
             service: bookingData.service,
             date: bookingData.date,
