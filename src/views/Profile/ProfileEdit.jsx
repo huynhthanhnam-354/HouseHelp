@@ -171,447 +171,283 @@ function ProfileEdit({ user, profileData, onCancel, onSave }) {
     }
   };
 
+  // Get user initials for avatar
+  const getInitials = (name) => {
+    if (!name) return "U";
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  // Format member since date
+  const formatMemberSince = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long' 
+    });
+  };
+
   return (
-    <div className="profile-page-container bg-gray-50">
-      <div className="w-full h-full px-4 py-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mx-auto max-w-6xl">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Edit Profile</h2>
-            <button
-              onClick={onCancel}
-              className="text-gray-500 hover:text-gray-700"
-              disabled={loading}
-            >
-              ✕
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Personal Information */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="fullName"
-                    value={formData.fullName}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="flex">
+            {/* Sidebar */}
+            <div className="w-80 bg-white border-r border-gray-200 p-6">
+              {/* Avatar and Name */}
+              <div className="text-center mb-6">
+                <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
+                  {getInitials(profileData?.fullName)}
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Date of Birth
-                  </label>
-                  <input
-                    type="date"
-                    name="dateOfBirth"
-                    value={formData.dateOfBirth}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Gender
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-
-                <div className="lg:col-span-2 xl:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Address
-                  </label>
-                  <input
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    District
-                  </label>
-                  <input
-                    type="text"
-                    name="district"
-                    value={formData.district}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Languages
-                  </label>
-                  <input
-                    type="text"
-                    name="languages"
-                    value={formData.languages}
-                    onChange={handleChange}
-                    placeholder="e.g., Tiếng Việt, English"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Emergency Contact
-                  </label>
-                  <input
-                    type="tel"
-                    name="emergencyContact"
-                    value={formData.emergencyContact}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Emergency Contact Name
-                  </label>
-                  <input
-                    type="text"
-                    name="emergencyContactName"
-                    value={formData.emergencyContactName}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="lg:col-span-2 xl:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Bio
-                  </label>
-                  <textarea
-                    name="bio"
-                    value={formData.bio}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                <h2 className="text-xl font-bold text-gray-900">{profileData?.fullName || "N/A"}</h2>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-full capitalize">
+                    {user?.role || "Customer"}
+                  </span>
+                  {user?.role === "housekeeper" && (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 text-sm rounded-full">
+                      Senior
+                    </span>
+                  )}
                 </div>
               </div>
-            </div>
 
-                        {/* Housekeeper Information */}
-            {user?.role === "housekeeper" && (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Professional Information</h3>
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2 xl:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Professional Description
-                    </label>
-                    <textarea
-                      name="description"
-                      value={formData.description}
-                      onChange={handleChange}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Experience (Years)
-                    </label>
-                    <input
-                      type="number"
-                      name="experience"
-                      value={formData.experience}
-                      onChange={handleChange}
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Price (VNĐ)
-                    </label>
-                    <input
-                      type="number"
-                      name="price"
-                      value={formData.price}
-                      onChange={handleChange}
-                      min="0"
-                      step="1000"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Price Type
-                    </label>
-                    <select
-                      name="priceType"
-                      value={formData.priceType}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="hourly">Per Hour</option>
-                      <option value="daily">Per Day</option>
-                      <option value="per_service">Per Service</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Working Hours
-                    </label>
-                    <input
-                      type="text"
-                      name="workingHours"
-                      value={formData.workingHours}
-                      onChange={handleChange}
-                      placeholder="e.g., 08:00-17:00"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Service Radius (km)
-                    </label>
-                    <input
-                      type="number"
-                      name="serviceRadius"
-                      value={formData.serviceRadius}
-                      onChange={handleChange}
-                      min="1"
-                      max="50"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div className="lg:col-span-2 xl:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Services Offered
-                    </label>
-                    <input
-                      type="text"
-                      name="services"
-                      value={formData.services}
-                      onChange={handleChange}
-                      placeholder="e.g., Vệ sinh nhà cửa, Giặt ủi, Nấu ăn"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+              {/* Contact Info */}
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center gap-3 text-gray-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm">{user?.email || "N/A"}</span>
+                </div>
+                
+                <div className="flex items-center gap-3 text-gray-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <span className="text-sm">{profileData?.phone || "N/A"}</span>
                 </div>
 
-                {/* ID Card Upload Section */}
-                <div className="mt-8">
-                  <h4 className="text-md font-semibold text-gray-900 mb-4">Verification Documents</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        ID Card (Front) *
-                      </label>
-                      <div 
-                        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
-                        onClick={() => triggerFileInput('idCardFront')}
-                      >
-                        {filePreviews.idCardFront ? (
-                          <div className="space-y-2">
-                            <img 
-                              src={filePreviews.idCardFront} 
-                              alt="ID Card Front Preview" 
-                              className="mx-auto h-24 w-auto rounded border"
-                            />
-                            <p className="text-sm text-green-600 font-medium">✓ File uploaded</p>
-                            <p className="text-xs text-gray-500">Click to change</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            <div className="text-sm text-gray-600">
-                              <span className="font-medium text-blue-600 hover:text-blue-500">
-                                Click to upload
-                              </span> or drag and drop
-                            </div>
-                            <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB (auto-compressed)</p>
-                          </div>
-                        )}
-                        <input 
-                          id="idCardFront"
-                          type="file" 
-                          className="hidden" 
-                          accept="image/*"
-                          onChange={(e) => handleFileChange('idCardFront', e.target.files[0])}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        ID Card (Back) *
-                      </label>
-                      <div 
-                        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
-                        onClick={() => triggerFileInput('idCardBack')}
-                      >
-                        {filePreviews.idCardBack ? (
-                          <div className="space-y-2">
-                            <img 
-                              src={filePreviews.idCardBack} 
-                              alt="ID Card Back Preview" 
-                              className="mx-auto h-24 w-auto rounded border"
-                            />
-                            <p className="text-sm text-green-600 font-medium">✓ File uploaded</p>
-                            <p className="text-xs text-gray-500">Click to change</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            <div className="text-sm text-gray-600">
-                              <span className="font-medium text-blue-600 hover:text-blue-500">
-                                Click to upload
-                              </span> or drag and drop
-                            </div>
-                            <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB (auto-compressed)</p>
-                          </div>
-                        )}
-                        <input 
-                          id="idCardBack"
-                          type="file" 
-                          className="hidden" 
-                          accept="image/*"
-                          onChange={(e) => handleFileChange('idCardBack', e.target.files[0])}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Skills & Certifications */}
-                <div className="mt-8">
-                  <h4 className="text-md font-semibold text-gray-900 mb-4">Skills & Certifications</h4>
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Professional Skills
-                      </label>
-                      <textarea
-                        name="skills"
-                        value={formData.skills}
-                        onChange={handleChange}
-                        placeholder="e.g., Vệ sinh chuyên nghiệp, Nấu ăn ngon, Chăm sóc trẻ em..."
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Separate skills with commas</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Certifications
-                      </label>
-                      <textarea
-                        name="certifications"
-                        value={formData.certifications}
-                        onChange={handleChange}
-                        placeholder="e.g., Chứng chỉ vệ sinh an toàn thực phẩm, Chứng chỉ sơ cấp cứu..."
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">List your professional certifications</p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        id="hasInsurance"
-                        name="hasInsurance"
-                        checked={formData.hasInsurance}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="hasInsurance" className="text-sm font-medium text-gray-700">
-                        I have professional insurance coverage
-                      </label>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-3 text-gray-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="text-sm">{profileData?.address || "N/A"}</span>
                 </div>
               </div>
-            )}
 
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
+              {/* Edit Profile Button */}
               <button
                 type="button"
                 onClick={onCancel}
-                disabled={loading}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium mb-6"
               >
-                Cancel
+                Edit Profile
               </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                {loading ? "Saving..." : "Save Changes"}
-              </button>
+
+              {/* Quick Stats - Only for Housekeeper */}
+              {user?.role === "housekeeper" && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Stats</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Rating</span>
+                      <div className="flex items-center gap-1">
+                        <svg className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        <span className="text-sm font-semibold">4.8</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Jobs Completed</span>
+                      <span className="text-sm font-semibold">127</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Hourly Rate</span>
+                      <span className="text-sm font-semibold text-green-600">
+                        ${profileData?.housekeeper?.price || 25}/hr
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </form>
+
+            {/* Main Content */}
+            <div className="flex-1">
+              {/* Tabs */}
+              <div className="border-b border-gray-200">
+                <nav className="flex">
+                  <button className="px-6 py-4 text-sm font-medium border-b-2 border-blue-500 text-blue-600">
+                    Personal Info
+                  </button>
+                  <button className="px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    Booking History
+                  </button>
+                  {user?.role === "housekeeper" && (
+                    <button className="px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                      Statistics
+                    </button>
+                  )}
+                </nav>
+              </div>
+
+              {/* Form Content */}
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-6">Personal Information</h3>
+                
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Full Name
+                      </label>
+                      <input
+                        type="text"
+                        name="fullName"
+                        value={formData.fullName}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter your full name"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={user?.email || ''}
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed"
+                        placeholder="Your email address"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter your phone number"
+                      />
+                    </div>
+
+                    {user?.role === "housekeeper" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Hourly Rate
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                          <input
+                            type="number"
+                            name="price"
+                            value={formData.price}
+                            onChange={handleChange}
+                            min="0"
+                            step="1"
+                            className="w-full pl-8 pr-12 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="25"
+                          />
+                          <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">/hr</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Address
+                      </label>
+                      <input
+                        type="text"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter your full address"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Bio
+                      </label>
+                      <textarea
+                        name="bio"
+                        value={formData.bio}
+                        onChange={handleChange}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Tell us about your experience and what makes you special..."
+                      />
+                    </div>
+
+                    {user?.role === "housekeeper" && (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Services Offered
+                        </label>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                            Cleaning
+                          </span>
+                          <span className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">
+                            Cooking
+                          </span>
+                          <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded-full">
+                            Laundry
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          name="services"
+                          value={formData.services}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Enter services you offer (comma separated)"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={onCancel}
+                      disabled={loading}
+                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                      {loading ? "Saving..." : "Save Changes"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-export default ProfileEdit; 
+export default ProfileEdit;
