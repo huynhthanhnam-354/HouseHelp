@@ -34,7 +34,7 @@ db.connect(err => {
 
 // API: Lấy tất cả housekeepers (filter dịch vụ theo bảng housekeeper_services, OR logic)
 app.get('/api/housekeepers', (req, res) => {
-  const { services, minRating, maxPrice, available } = req.query;
+  const { services, exactRating, maxPrice, available } = req.query;
   
   // Nếu có filter services, trước tiên cần chuyển tên service thành serviceId
   if (services) {
@@ -95,9 +95,11 @@ app.get('/api/housekeepers', (req, res) => {
     }
     sql += ` GROUP BY h.id, h.userId, h.services, h.price, h.available, h.description, u.fullName, u.email, u.phone`;
     // BỎ HAVING COUNT(DISTINCT hs.serviceId) = ... để filter OR
-    if (minRating) {
-      having.push(`AVG(r.rating) >= ?`);
-      params.push(Number(minRating));
+    if (exactRating) {
+      // Lọc theo rating chính xác (ví dụ: 4 sao = 4.0-4.9)
+      having.push(`AVG(r.rating) >= ? AND AVG(r.rating) < ?`);
+      params.push(Number(exactRating));
+      params.push(Number(exactRating) + 1);
     }
     if (having.length) {
       sql += ` HAVING ` + having.join(" AND ");
@@ -658,11 +660,11 @@ app.get('/api/filters/ratings', (req, res) => {
   // Trả về tất cả các lựa chọn rating từ 1-5 sao, bao gồm "Any rating"
   const ratings = [
     { value: null, label: "Any rating", stars: 5 },
-    { value: 5, label: "5+ stars", stars: 5 },
-    { value: 4, label: "4+ stars", stars: 4 },
-    { value: 3, label: "3+ stars", stars: 3 },
-    { value: 2, label: "2+ stars", stars: 2 },
-    { value: 1, label: "1+ stars", stars: 1 }
+    { value: 5, label: "5 stars", stars: 5 },
+    { value: 4, label: "4 stars", stars: 4 },
+    { value: 3, label: "3 stars", stars: 3 },
+    { value: 2, label: "2 stars", stars: 2 },
+    { value: 1, label: "1 star", stars: 1 }
   ];
   res.json(ratings);
 });

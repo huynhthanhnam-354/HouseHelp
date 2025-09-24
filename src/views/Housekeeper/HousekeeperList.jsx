@@ -4,7 +4,7 @@ import HousekeeperCard from "./HousekeeperCard";
 function buildQuery(filter) {
   const params = [];
   if (filter.services && filter.services.length > 0) params.push(`services=${filter.services.join(",")}`);
-  if (filter.minRating) params.push(`minRating=${filter.minRating}`);
+  if (filter.exactRating) params.push(`exactRating=${filter.exactRating}`);
   if (filter.maxPrice) params.push(`maxPrice=${filter.maxPrice}`);
   if (filter.available) params.push(`available=${filter.available}`);
   return params.length ? `?${params.join("&")}` : "";
@@ -74,7 +74,7 @@ export default function HousekeeperList({ filter }) {
       }
       
       // Filter by minimum rating
-      if (filter.minRating && parseFloat(hk.rating) < parseFloat(filter.minRating)) {
+      if (filter.exactRating && (parseFloat(hk.rating) < parseFloat(filter.exactRating) || parseFloat(hk.rating) >= parseFloat(filter.exactRating) + 1)) {
         return false;
       }
       

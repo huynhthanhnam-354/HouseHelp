@@ -7,7 +7,7 @@ export default function FilterSidebar({ onFilterChange }) {
   const [availability, setAvailability] = useState([]);
   const [filter, setFilter] = useState({
     services: [],
-    minRating: null,
+    exactRating: null,
     minPrice: null,
     maxPrice: null,
     available: null,
@@ -41,10 +41,10 @@ export default function FilterSidebar({ onFilterChange }) {
         : [...f.services, s],
     }));
   };
-  const handleRating = r => setFilter(f => ({ ...f, minRating: r.value }));
+  const handleRating = r => setFilter(f => ({ ...f, exactRating: r.value }));
   const handlePrice = e => setFilter(f => ({ ...f, maxPrice: Number(e.target.value) }));
   const handleAvailable = e => setFilter(f => ({ ...f, available: e.target.checked ? 1 : null }));
-  const handleClear = () => setFilter({ services: [], minRating: null, minPrice: null, maxPrice: null, available: null });
+  const handleClear = () => setFilter({ services: [], exactRating: null, minPrice: null, maxPrice: null, available: null });
 
   const uniqueServices = [...new Set(services)].filter(s => s != null && s !== "");
   
@@ -65,11 +65,11 @@ export default function FilterSidebar({ onFilterChange }) {
         </div>
       </div>
       <div className="filter-section">
-        <div className="filter-label">Minimum Rating</div>
+        <div className="filter-label">Rating</div>
         <div className="filter-rating-list">
           {ratings.map((r, idx) => (
             <label className="filter-rating-tag" key={`rating-${componentId}-${idx}`}>
-              <input type="radio" name={`minRating-${componentId}`} checked={filter.minRating === r.value} onChange={() => handleRating(r)} />
+              <input type="radio" name={`exactRating-${componentId}`} checked={filter.exactRating === r.value} onChange={() => handleRating(r)} />
               <span className="filter-stars">{"★".repeat(r.stars)}<span className="filter-stars-empty">{"☆".repeat(5 - r.stars)}</span></span>
               {r.label}
             </label>
