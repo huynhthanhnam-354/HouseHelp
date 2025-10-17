@@ -114,6 +114,7 @@ CREATE TABLE bookings (
   startDate DATETIME NOT NULL,
   endDate DATETIME,
   status ENUM('pending','confirmed','in_progress','completed','cancelled') DEFAULT 'pending',
+  paymentStatus ENUM('pending','success','failed') DEFAULT 'pending',
   totalPrice DECIMAL(10,2),
   notes TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   customerAddress TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -295,3 +296,108 @@ INSERT INTO system_logs (userId, action, description, ipAddress) VALUES
 (5,'LOGIN','Admin đăng nhập hệ thống','192.168.1.10'),
 (1,'UPDATE_PROFILE','Nguyễn Thị Lan cập nhật thông tin hồ sơ','192.168.1.15'),
 (3,'BOOKING_CREATED','Lê Thị Hoa tạo đơn đặt dịch vụ dọn dẹp','192.168.1.20');
+
+-- ========================
+-- COMPLETION & PAYMENT DATA
+-- ========================
+
+-- Cập nhật một số booking thành trạng thái confirmed để test completion
+UPDATE bookings SET status = 'confirmed' WHERE id IN (1, 2);
+
+-- Thêm booking mẫu với trạng thái completed để test payment
+INSERT INTO bookings (customerId, housekeeperId, serviceId, startDate, endDate, status, paymentStatus, totalPrice, notes, customerAddress, time, duration, location, customerName, customerEmail, customerPhone, housekeeperName, service, createdAt) VALUES
+(3, 1, 1, '2025-10-17 10:00:00', '2025-10-17 13:00:00', 'completed', 'success', 300000, 'Đã hoàn thành dọn dẹp nhà cửa', 'Quận 7, TP.HCM', '10:00', 3, 'Quận 7, TP.HCM', 'Lê Thị Hoa', 'hoa.le@email.com', '0923456789', 'Nguyễn Thị Lan', 'Dọn dẹp nhà cửa', NOW()),
+(4, 2, 2, '2025-10-17 14:00:00', '2025-10-17 17:00:00', 'completed', 'pending', 250000, 'Đã hoàn thành giặt ủi quần áo', 'Quận Ba Đình, Hà Nội', '14:00', 3, 'Quận Ba Đình, Hà Nội', 'Phạm Văn Tuấn', 'tuan.pham@email.com', '0934567890', 'Trần Văn Minh', 'Giặt ủi quần áo', NOW());
+
+-- Thêm payment records cho các booking completed
+INSERT INTO payments (bookingId, customerId, method, amount, status, transactionCode, paidAt, createdAt) VALUES
+-- Payment cho booking vừa hoàn thành
+((SELECT MAX(id)-1 FROM bookings), 3, 'e_wallet', 300000, 'success', 'PAY_' || UNIX_TIMESTAMP(), NOW(), NOW()),
+((SELECT MAX(id) FROM bookings), 4, 'bank_transfer', 250000, 'success', 'PAY_' || UNIX_TIMESTAMP(), NOW(), NOW()),
+-- Payment cho booking cũ
+(1, 3, 'cash', 240000, 'success', 'PAY_CASH_001', NOW(), NOW());
+
+-- Cập nhật completedJobs cho housekeepers
+UPDATE housekeepers SET 
+  completedJobs = completedJobs + 2,
+  updatedAt = NOW()
+WHERE id = 1; -- Nguyễn Thị Lan
+
+UPDATE housekeepers SET 
+  completedJobs = completedJobs + 1,
+  updatedAt = NOW()
+WHERE id = 2; -- Trần Văn Minh
+
+-- Thêm reviews cho các booking đã hoàn thành
+INSERT INTO reviews (bookingId, housekeeperId, customerId, rating, comment, createdAt) VALUES
+((SELECT MAX(id)-1 FROM bookings), 1, 3, 5, 'Dịch vụ tuyệt vời! Nhà cửa sạch sẽ và gọn gàng. Sẽ sử dụng lại dịch vụ.', NOW()),
+((SELECT MAX(id) FROM bookings), 2, 4, 4, 'Làm việc chuyên nghiệp, quần áo được giặt sạch và ủi phẳng. Hài lòng với dịch vụ.', NOW()),
+(1, 1, 3, 5, 'Chị Lan làm việc rất tận tâm và cẩn thận. Highly recommended!', NOW());
+
+-- Cập nhật rating trung bình cho housekeepers
+UPDATE housekeepers h SET 
+  rating = (SELECT AVG(r.rating) FROM reviews r WHERE r.housekeeperId = h.id),
+  totalReviews = (SELECT COUNT(*) FROM reviews r WHERE r.housekeeperId = h.id),
+  updatedAt = NOW()
+WHERE h.id IN (1, 2);
+
+-- Thêm notifications cho completion & payment flow
+INSERT INTO notifications (userId, type, title, message, bookingId, data, createdAt, read_status) VALUES
+-- Notification cho customer khi housekeeper hoàn thành
+(3, 'booking_completed', 'Công việc đã hoàn thành', 'Nguyễn Thị Lan đã hoàn thành công việc. Vui lòng xác nhận và thanh toán.', (SELECT MAX(id)-1 FROM bookings), '{"paymentRequired": true}', NOW(), 0),
+(4, 'booking_completed', 'Công việc đã hoàn thành', 'Trần Văn Minh đã hoàn thành công việc. Vui lòng xác nhận và thanh toán.', (SELECT MAX(id) FROM bookings), '{"paymentRequired": true}', NOW(), 0),
+
+-- Notification cho housekeeper khi nhận được thanh toán
+(1, 'payment_received', 'Đã nhận thanh toán', 'Lê Thị Hoa đã xác nhận và thanh toán 300,000 VND', (SELECT MAX(id)-1 FROM bookings), '{"amount": 300000, "method": "e_wallet"}', NOW(), 0),
+(2, 'payment_received', 'Đã nhận thanh toán', 'Phạm Văn Tuấn đã xác nhận và thanh toán 250,000 VND', (SELECT MAX(id) FROM bookings), '{"amount": 250000, "method": "bank_transfer"}', NOW(), 0);
+
+-- Thêm system logs cho completion & payment activities
+INSERT INTO system_logs (userId, action, description, ipAddress, createdAt) VALUES
+(1, 'BOOKING_COMPLETED', 'Housekeeper đánh dấu booking hoàn thành', '192.168.1.25', NOW()),
+(2, 'BOOKING_COMPLETED', 'Housekeeper đánh dấu booking hoàn thành', '192.168.1.26', NOW()),
+(3, 'PAYMENT_CONFIRMED', 'Customer xác nhận thanh toán booking', '192.168.1.30', NOW()),
+(4, 'PAYMENT_CONFIRMED', 'Customer xác nhận thanh toán booking', '192.168.1.31', NOW()),
+(5, 'ADMIN_VIEW_STATS', 'Admin xem thống kê doanh thu', '192.168.1.10', NOW());
+
+-- ========================
+-- VERIFICATION QUERIES
+-- ========================
+
+-- Kiểm tra dữ liệu completion & payment
+SELECT 'BOOKING STATUS' as info, status, COUNT(*) as count FROM bookings GROUP BY status
+UNION ALL
+SELECT 'PAYMENT STATUS', status, COUNT(*) FROM payments GROUP BY status
+UNION ALL
+SELECT 'TOTAL REVENUE', 'success', SUM(amount) FROM payments WHERE status = 'success'
+UNION ALL
+SELECT 'TODAY REVENUE', 'today', SUM(amount) FROM payments WHERE DATE(paidAt) = CURDATE() AND status = 'success'
+UNION ALL
+SELECT 'COMPLETED JOBS', 'housekeeper_1', completedJobs FROM housekeepers WHERE id = 1
+UNION ALL
+SELECT 'COMPLETED JOBS', 'housekeeper_2', completedJobs FROM housekeepers WHERE id = 2
+UNION ALL
+SELECT 'AVG RATING', 'housekeeper_1', rating FROM housekeepers WHERE id = 1
+UNION ALL
+SELECT 'AVG RATING', 'housekeeper_2', rating FROM housekeepers WHERE id = 2;
+
+-- ========================
+-- DATABASE UPDATE COMMANDS
+-- ========================
+
+-- Thêm cột paymentStatus nếu chưa có (cho database hiện tại)
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS paymentStatus ENUM('pending','success','failed') DEFAULT 'pending' AFTER status;
+
+-- Cập nhật paymentStatus cho các booking đã có payment thành công
+UPDATE bookings b 
+SET paymentStatus = 'success' 
+WHERE EXISTS (
+    SELECT 1 FROM payments p 
+    WHERE p.bookingId = b.id AND p.status = 'success'
+);
+
+-- Kiểm tra kết quả cập nhật
+SELECT 'PAYMENT STATUS UPDATE' as info, 
+       id, status, paymentStatus, totalPrice 
+FROM bookings 
+WHERE status = 'completed' 
+ORDER BY id DESC;

@@ -40,7 +40,15 @@ export default function LoginForm() {
         setSubmitError(res.error);
       } else {
         login(res); // Use useAuth login method
-        navigate("/");
+        
+        // Redirect based on user role
+        if (res.role === 'admin') {
+          // Admin redirect thẳng vào admin dashboard
+          navigate("/admin/dashboard");
+        } else {
+          // Customer và Housekeeper vào trang chủ trước
+          navigate("/");
+        }
       }
     } catch (e) {
       setSubmitError("Login failed. Please try again.");

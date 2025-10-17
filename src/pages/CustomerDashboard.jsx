@@ -4,6 +4,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import translations from '../locales/translations';
+import BookingCompletion from '../components/BookingCompletion';
 import './CustomerDashboard.css';
 
 export default function CustomerDashboard() {
@@ -16,6 +17,7 @@ export default function CustomerDashboard() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'notifications'
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Fetch customer's bookings
   useEffect(() => {
@@ -26,7 +28,11 @@ export default function CustomerDashboard() {
         const response = await fetch(`http://localhost:5000/api/bookings/user/${user.id}`);
         if (response.ok) {
           const data = await response.json();
-          setBookings(data);
+          // Sắp xếp booking theo thời gian tạo mới nhất lên đầu
+          const sortedBookings = data.sort((a, b) => {
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          });
+          setBookings(sortedBookings);
         }
       } catch (error) {
         console.error('Error fetching bookings:', error);
@@ -36,14 +42,43 @@ export default function CustomerDashboard() {
     };
 
     fetchBookings();
-  }, [user?.id]);
+  }, [user?.id, refreshTrigger]);
+
+  // Auto refresh mỗi 10 giây để cập nhật status
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefreshTrigger(prev => prev + 1);
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('vi-VN');
+    if (!dateString) return 'Chưa xác định';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Chưa xác định';
+      }
+      return date.toLocaleDateString('vi-VN');
+    } catch (error) {
+      return 'Chưa xác định';
+    }
   };
 
   const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString('vi-VN');
+    if (!timestamp) return 'Chưa xác định';
+    
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) {
+        return 'Chưa xác định';
+      }
+      return date.toLocaleTimeString('vi-VN');
+    } catch (error) {
+      return 'Chưa xác định';
+    }
   };
 
   const getStatusColor = (status) => {
@@ -103,10 +138,17 @@ export default function CustomerDashboard() {
 
   return (
     <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h1>Dashboard Khách Hàng</h1>
-        <p>Xin chào, <strong>{user?.fullName}</strong>!</p>
-      </div>
+        <div className="dashboard-header">
+          <h1>Dashboard Khách Hàng</h1>
+          <p>Xin chào, <strong>{user?.fullName}</strong>!</p>
+          <button 
+            className="refresh-btn"
+            onClick={() => setRefreshTrigger(prev => prev + 1)}
+            disabled={loading}
+          >
+            {loading ? '⏳ Đang tải...' : '🔄 Làm mới'}
+          </button>
+        </div>
 
       <div className="dashboard-tabs">
         <button 
@@ -154,16 +196,21 @@ export default function CustomerDashboard() {
             </div>
           ) : (
             <div className="bookings-list">
-              {bookings.map((booking) => (
+              {bookings.map((booking, index) => (
                 <div 
                   key={booking.id} 
                   id={`booking-${booking.id}`}
-                  className="booking-card"
+                  className={`booking-card ${index === 0 ? 'newest-booking' : ''}`}
                 >
                   <div className="booking-header">
                     <div className="booking-id">
                       <span className="label">Mã đặt lịch:</span>
-                      <span className="value">#{booking.id}</span>
+                      <button 
+                        className="booking-link"
+                        onClick={() => navigate(`/booking-view/${booking.id}`)}
+                      >
+                        #{booking.id} {index === 0 && <span className="new-badge">MỚI NHẤT</span>}
+                      </button>
                     </div>
                     <div 
                       className="booking-status"
@@ -187,7 +234,7 @@ export default function CustomerDashboard() {
                     <div className="booking-details">
                       <div className="detail-row">
                         <span className="label">Ngày:</span>
-                        <span className="value">{formatDate(booking.date)}</span>
+                        <span className="value">{formatDate(booking.startDate || booking.date)}</span>
                       </div>
                       <div className="detail-row">
                         <span className="label">Giờ:</span>
@@ -217,6 +264,12 @@ export default function CustomerDashboard() {
                         <p>{booking.notes}</p>
                       </div>
                     )}
+
+                    {/* Booking Completion Component */}
+                    <BookingCompletion 
+                      booking={booking} 
+                      onStatusUpdate={() => setRefreshTrigger(prev => prev + 1)}
+                    />
                   </div>
                 </div>
               ))}

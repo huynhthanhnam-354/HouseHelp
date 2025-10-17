@@ -89,7 +89,8 @@ export default function Header({ keyword, setKeyword, onSearch }) {
                   <div className="dropdown-user-info">
                     <div className="dropdown-name">{user?.fullName}</div>
                     <div className="dropdown-role">
-                      {user?.role === 'housekeeper' ? t.housekeeper : t.customer}
+                      {user?.role === 'housekeeper' ? t.housekeeper : 
+                       user?.role === 'admin' ? 'Admin' : t.customer}
                     </div>
                   </div>
                 </div>
@@ -108,6 +109,12 @@ export default function Header({ keyword, setKeyword, onSearch }) {
                   <button className="dropdown-item" onClick={() => { navigate("/customer/dashboard"); setShowDropdown(false); }}>
                     <span className="dropdown-icon">📋</span>
                     Dashboard
+                  </button>
+                )}
+                {user?.role === 'admin' && (
+                  <button className="dropdown-item" onClick={() => { navigate("/admin/dashboard"); setShowDropdown(false); }}>
+                    <span className="dropdown-icon">👑</span>
+                    Admin Dashboard
                   </button>
                 )}
                 <button className="dropdown-item" onClick={handleSettings}>

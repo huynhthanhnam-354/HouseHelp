@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
 import RatingStars from "../Common/RatingStars";
 import Button from "../Common/Button";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -11,6 +12,7 @@ export default function HousekeeperCard({ hk }) {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { setHousekeeper } = useBooking();
+  const { user, isAuthenticated } = useAuth();
   const t = translations[language];
 
   const services = Array.isArray(hk.services)
@@ -20,7 +22,10 @@ export default function HousekeeperCard({ hk }) {
   const rating = parseFloat(hk.rating) || 0;
   const reviewCount = parseInt(hk.reviewCount) || 0;
 
-  const isAuthenticated = () => {
+  // Kiểm tra xem user có phải là housekeeper không
+  const isHousekeeperUser = user && user.role === 'housekeeper';
+
+  const isAuthenticatedOld = () => {
     try {
       const userData = localStorage.getItem("househelp_user");
       const isAuth = userData && userData !== "null" && userData !== "undefined";
@@ -31,7 +36,13 @@ export default function HousekeeperCard({ hk }) {
   };
 
   const handleBookNow = () => {
-    if (isAuthenticated()) {
+    // Ngăn housekeeper đặt lịch
+    if (isHousekeeperUser) {
+      alert("Bạn là người giúp việc, không thể đặt lịch cho người giúp việc khác. Chỉ khách hàng mới có thể đặt lịch.");
+      return;
+    }
+
+    if (isAuthenticated) {
       console.log("Original housekeeper data:", hk);
       
       // Process housekeeper data and set it in booking context
@@ -108,9 +119,16 @@ export default function HousekeeperCard({ hk }) {
       </div>
 
       <div className="hk-actions">
-        <button className="hk-book-btn" onClick={handleBookNow}>
-          {t.bookNow}
-        </button>
+        {isHousekeeperUser ? (
+          <div className="hk-info-message">
+            <span className="info-icon">👀</span>
+            <span className="info-text">Chỉ xem thông tin</span>
+          </div>
+        ) : (
+          <button className="hk-book-btn" onClick={handleBookNow}>
+            {t.bookNow}
+          </button>
+        )}
       </div>
     </div>
   );

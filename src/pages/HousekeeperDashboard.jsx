@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import translations from '../locales/translations';
+import BookingCompletion from '../components/BookingCompletion';
 import './HousekeeperDashboard.css';
 
 export default function HousekeeperDashboard() {
@@ -15,45 +16,40 @@ export default function HousekeeperDashboard() {
   const [loading, setLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Lọc notifications về booking mới (đơn giản hơn)
+  // Fetch bookings từ database thay vì dựa vào notifications
   useEffect(() => {
-    console.log('=== HousekeeperDashboard useEffect ===');
-    console.log('Notifications count:', notifications.length);
-    console.log('Current pendingBookings count:', pendingBookings.length);
-    
-    // Get all new_booking notifications that are still pending
-    const bookingNotifications = notifications.filter(notif => {
-      const isPending = notif.data?.status === 'pending' || !notif.data?.status; // Default to pending if no status
-      console.log(`Notification ${notif.data?.id}: type=${notif.type}, status=${notif.data?.status}, isPending=${isPending}`);
-      return notif.type === 'new_booking' && isPending;
-    });
-    
-    console.log('New booking notifications:', bookingNotifications.length);
-    
-    const bookings = bookingNotifications.map(notif => {
-      const booking = {
-        id: notif.data?.id || notif.bookingId,
-        customerId: notif.data?.customerId || 4, // Use customer ID from notification data
-        customerName: notif.data?.customerName || 'Unknown Customer',
-        customerPhone: notif.data?.customerPhone || notif.data?.phone || 'N/A',
-        customerEmail: notif.data?.customerEmail || notif.data?.email || 'N/A',
-        service: notif.data?.service || 'Không xác định',
-        date: notif.data?.date || new Date().toISOString().split('T')[0],
-        time: notif.data?.time || '08:00',
-        duration: notif.data?.duration || 2,
-        location: notif.data?.location || 'Chưa cung cấp',
-        notes: notif.data?.notes || '',
-        totalPrice: notif.data?.totalPrice || 0,
-        createdAt: notif.timestamp || new Date().toISOString(),
-        notificationId: notif.id
-      };
+    const fetchHousekeeperBookings = async () => {
+      if (!user?.id) return;
       
-      return booking;
-    });
-    
-    console.log('Setting pendingBookings to:', bookings.length, 'items');
-    setPendingBookings(bookings);
-  }, [notifications]);
+      try {
+        setLoading(true);
+        const response = await fetch(`http://localhost:5000/api/bookings/user/${user.id}`);
+        if (response.ok) {
+          const allBookings = await response.json();
+          
+              // Lọc bookings cho housekeeper (pending và confirmed)
+              const housekeeperBookings = allBookings.filter(booking =>
+                booking.housekeeperId === user.id &&
+                (booking.status === 'pending' || booking.status === 'confirmed')
+              );
+
+              // Sắp xếp booking theo thời gian tạo mới nhất lên đầu
+              const sortedBookings = housekeeperBookings.sort((a, b) => {
+                return new Date(b.createdAt) - new Date(a.createdAt);
+              });
+
+              console.log('Housekeeper bookings (sorted):', sortedBookings);
+              setPendingBookings(sortedBookings);
+        }
+      } catch (error) {
+        console.error('Error fetching housekeeper bookings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHousekeeperBookings();
+  }, [user?.id, refreshTrigger]);
 
   // Xác nhận booking
   const handleConfirmBooking = async (booking) => {
@@ -199,15 +195,22 @@ export default function HousekeeperDashboard() {
           </div>
         ) : (
           <div className="bookings-list">
-            {pendingBookings.map((booking) => (
-              <div key={booking.id} className="booking-card">
+            {pendingBookings.map((booking, index) => (
+              <div key={booking.id} className={`booking-card ${index === 0 ? 'newest-booking' : ''}`}>
                 <div className="booking-header">
                   <div className="customer-info">
                     <div className="customer-avatar">
                       {booking.customerName?.charAt(0) || 'C'}
                     </div>
                     <div className="customer-details">
-                      <h3>{booking.customerName}</h3>
+                      <h3>
+                        <button 
+                          className="booking-link"
+                          onClick={() => navigate(`/booking-view/${booking.id}`)}
+                        >
+                          {booking.customerName} (#{booking.id}) {index === 0 && <span className="new-badge">MỚI NHẤT</span>}
+                        </button>
+                      </h3>
                       <p>{booking.customerPhone}</p>
                       <p>{booking.customerEmail}</p>
                     </div>
@@ -269,6 +272,12 @@ export default function HousekeeperDashboard() {
                     {loading ? 'Đang xử lý...' : 'Xác nhận'}
                   </button>
                 </div>
+
+                {/* Booking Completion Component */}
+                <BookingCompletion 
+                  booking={booking} 
+                  onStatusUpdate={() => setRefreshTrigger(prev => prev + 1)}
+                />
               </div>
             ))}
           </div>

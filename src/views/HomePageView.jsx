@@ -4,6 +4,7 @@ import HousekeeperList from "./Housekeeper/HousekeeperList";
 import QuickInfo from "./Housekeeper/QuickInfo";
 import SpecialOffer from "./Housekeeper/SpecialOffer";
 import Header from "./Header";
+import { useAuth } from "../hooks/useAuth";
 
 // ...existing code...
 
@@ -50,6 +51,7 @@ function Footer() {
 export default function HomePageView() {
   const [filter, setFilter] = useState(null);
   const [keyword, setKeyword] = useState("");
+  const { user, isAuthenticated } = useAuth();
 
   // Xử lý sự kiện tìm kiếm
   const handleSearch = () => {
@@ -67,6 +69,33 @@ export default function HomePageView() {
     }
   }, [keyword]);
 
+  // Hiển thị welcome message cho user đã đăng nhập
+  const renderWelcomeSection = () => {
+    if (!isAuthenticated || !user) return null;
+
+    return (
+      <div className="welcome-section">
+        <div className="welcome-card">
+          <h2>👋 Chào mừng trở lại, {user.fullName}!</h2>
+          {user.role === 'customer' && (
+            <p>Tìm kiếm người giúp việc phù hợp với nhu cầu của bạn</p>
+          )}
+          {user.role === 'housekeeper' && (
+            <div>
+              <p>Chào mừng bạn đến với HouseHelp! Bạn có thể quản lý công việc của mình tại dashboard.</p>
+              <button 
+                className="dashboard-btn"
+                onClick={() => window.location.href = '/housekeeper/dashboard'}
+              >
+                📋 Đi tới Dashboard
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="home-root">
       <Header
@@ -74,6 +103,9 @@ export default function HomePageView() {
         setKeyword={setKeyword}
         onSearch={handleSearch}
       />
+      
+      {renderWelcomeSection()}
+      
       <div className="home-layout">
         <aside className="sidebar">
           <FilterSidebar onFilterChange={setFilter} />
