@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import RatingStars from "../Common/RatingStars";
 import Button from "../Common/Button";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useBooking } from "../../contexts/BookingContext";
+import ReviewsList from "../../components/Reviews/ReviewsList";
 import translations from "../../locales/translations";
 import "./HousekeeperCard.css";
 
@@ -14,6 +15,7 @@ export default function HousekeeperCard({ hk }) {
   const { setHousekeeper } = useBooking();
   const { user, isAuthenticated } = useAuth();
   const t = translations[language];
+  const [showReviews, setShowReviews] = useState(false);
 
   const services = Array.isArray(hk.services)
     ? hk.services
@@ -100,7 +102,7 @@ export default function HousekeeperCard({ hk }) {
           <div className="hk-avatar">{hk.initials}</div>
           <div className="hk-basic-info">
             <div className="hk-name">{hk.fullName}</div>
-            <div className="hk-rating-section">
+            <div className="hk-rating-section" onClick={() => setShowReviews(true)} style={{cursor: 'pointer'}}>
               <RatingStars rating={rating} />
               <span className="hk-rating-text">
                 {rating.toFixed(1)} ({reviewCount} {t.reviews})
@@ -130,6 +132,26 @@ export default function HousekeeperCard({ hk }) {
           </button>
         )}
       </div>
+
+      {/* Reviews Modal */}
+      {showReviews && (
+        <div className="reviews-modal-overlay" onClick={() => setShowReviews(false)}>
+          <div className="reviews-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="reviews-modal-header">
+              <h2>📝 Đánh giá cho {hk.fullName}</h2>
+              <button 
+                className="reviews-modal-close"
+                onClick={() => setShowReviews(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="reviews-modal-body">
+              <ReviewsList housekeeperId={hk.id} showAll={true} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -363,3 +363,28 @@
   100% { transform: scale(1); }
 }
 
+/* Verification warning styles */
+.verification-warning {
+  margin: 20px 0;
+}
+
+.warning-card {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.warning-card h3 {
+  color: #856404;
+  margin: 0 0 10px 0;
+  font-size: 18px;
+}
+
+.warning-card p {
+  color: #856404;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+

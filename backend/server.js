@@ -9,7 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: ["http://localhost:3000", "http://localhost:5174"],
     methods: ["GET", "POST"]
   }
 });
@@ -65,12 +65,13 @@ app.get('/api/housekeepers', (req, res) => {
   
   function executeMainQuery(serviceIds) {
     let sql = `
-      SELECT h.*, u.fullName, u.email, u.phone,
+      SELECT h.*, u.fullName, u.email, u.phone, u.isVerified, u.isApproved,
              COALESCE(AVG(r.rating), 0) as avgRating,
              COUNT(r.id) as reviewCount
       FROM housekeepers h
       JOIN users u ON h.userId = u.id
       LEFT JOIN reviews r ON h.id = r.housekeeperId
+      WHERE u.isApproved = 1 AND u.isVerified = 1
     `;
     const where = [];
     const having = [];
@@ -91,7 +92,7 @@ app.get('/api/housekeepers', (req, res) => {
     }
 
     if (where.length) {
-      sql += ` WHERE ` + where.join(" AND ");
+      sql += ` AND ` + where.join(" AND ");
     }
     sql += ` GROUP BY h.id, h.userId, h.services, h.price, h.available, h.description, u.fullName, u.email, u.phone`;
     // BỎ HAVING COUNT(DISTINCT hs.serviceId) = ... để filter OR
@@ -105,8 +106,6 @@ app.get('/api/housekeepers', (req, res) => {
       sql += ` HAVING ` + having.join(" AND ");
     }
 
-    console.log('Final SQL:', sql);
-    console.log('Final Params:', params);
     
     db.query(sql, params, (err, results) => {
       if (err) {
@@ -114,9 +113,14 @@ app.get('/api/housekeepers', (req, res) => {
         return res.status(500).json({ error: err });
       }
       
-      console.log('Query Results:', results);
+      // Lọc thêm một lần nữa để đảm bảo chỉ có housekeeper đã xác minh
+      const verifiedResults = results.filter(hk => {
+        const isVerified = hk.isVerified === 1 || hk.isVerified === true;
+        const isApproved = hk.isApproved === 1 || hk.isApproved === true;
+        return isVerified && isApproved;
+      });
       
-      const housekeepersWithInitials = results.map(hk => ({
+      const housekeepersWithInitials = verifiedResults.map(hk => ({
         ...hk,
         initials: hk.fullName.split(' ').map(n => n[0]).join('').toUpperCase(),
         rating: parseFloat(hk.avgRating).toFixed(1)
@@ -231,6 +235,81 @@ app.post('/api/login', (req, res) => {
     if (err) return res.status(500).json({ error: err });
     if (results.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
     res.json(results[0]);
+  });
+});
+
+// API: Lấy danh sách tất cả users (cho Admin Dashboard)
+app.get('/api/users', (req, res) => {
+  const { role, verified, approved, page = 1, limit = 50 } = req.query;
+  let sql = 'SELECT id, fullName, email, phone, role, isVerified, isApproved, createdAt, lastActiveAt FROM users WHERE 1=1';
+  const params = [];
+
+  // Filter theo role
+  if (role) {
+    sql += ' AND role = ?';
+    params.push(role);
+  }
+
+  // Filter theo verified status
+  if (verified !== undefined) {
+    sql += ' AND isVerified = ?';
+    params.push(verified === 'true' ? 1 : 0);
+  }
+
+  // Filter theo approved status
+  if (approved !== undefined) {
+    sql += ' AND isApproved = ?';
+    params.push(approved === 'true' ? 1 : 0);
+  }
+
+  // Pagination
+  const offset = (page - 1) * limit;
+  sql += ' ORDER BY createdAt DESC LIMIT ? OFFSET ?';
+  params.push(parseInt(limit), parseInt(offset));
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.log('SQL Error:', err);
+      return res.status(500).json({ error: err });
+    }
+
+    // Đếm tổng số users để tính pagination
+    let countSql = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
+    const countParams = [];
+
+    if (role) {
+      countSql += ' AND role = ?';
+      countParams.push(role);
+    }
+    if (verified !== undefined) {
+      countSql += ' AND isVerified = ?';
+      countParams.push(verified === 'true' ? 1 : 0);
+    }
+    if (approved !== undefined) {
+      countSql += ' AND isApproved = ?';
+      countParams.push(approved === 'true' ? 1 : 0);
+    }
+
+    db.query(countSql, countParams, (err, countResults) => {
+      if (err) {
+        console.log('Count SQL Error:', err);
+        return res.status(500).json({ error: err });
+      }
+
+      const total = countResults[0].total;
+      const totalPages = Math.ceil(total / limit);
+
+      res.json({
+        users: results,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: totalPages,
+          totalUsers: total,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        }
+      });
+    });
   });
 });
 
@@ -367,6 +446,118 @@ app.put('/api/housekeepers/:userId/profile', (req, res) => {
   });
 });
 
+// API: Lấy danh sách tất cả bookings (cho Admin Dashboard)
+app.get('/api/bookings', (req, res) => {
+  const { status, housekeeper, customer, date, month, year, page = 1, limit = 50 } = req.query;
+  
+  let sql = `
+    SELECT b.*, 
+           u1.fullName as customerName, u1.email as customerEmail,
+           u2.fullName as housekeeperName, u2.email as housekeeperEmail,
+           s.name as serviceName
+    FROM bookings b
+    LEFT JOIN users u1 ON b.customerId = u1.id
+    LEFT JOIN users u2 ON b.housekeeperId = u2.id  
+    LEFT JOIN services s ON b.serviceId = s.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  // Filter theo status
+  if (status) {
+    sql += ' AND b.status = ?';
+    params.push(status);
+  }
+
+  // Filter theo housekeeper
+  if (housekeeper) {
+    sql += ' AND b.housekeeperId = ?';
+    params.push(housekeeper);
+  }
+
+  // Filter theo customer
+  if (customer) {
+    sql += ' AND b.customerId = ?';
+    params.push(customer);
+  }
+
+  // Filter theo date
+  if (date) {
+    sql += ' AND DATE(b.startDate) = ?';
+    params.push(date);
+  }
+
+  // Filter theo month/year
+  if (month && year) {
+    sql += ' AND MONTH(b.startDate) = ? AND YEAR(b.startDate) = ?';
+    params.push(month, year);
+  } else if (year) {
+    sql += ' AND YEAR(b.startDate) = ?';
+    params.push(year);
+  }
+
+  // Pagination
+  const offset = (page - 1) * limit;
+  sql += ' ORDER BY b.createdAt DESC LIMIT ? OFFSET ?';
+  params.push(parseInt(limit), parseInt(offset));
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.log('SQL Error:', err);
+      return res.status(500).json({ error: err });
+    }
+
+    // Đếm tổng số bookings để tính pagination
+    let countSql = 'SELECT COUNT(*) as total FROM bookings b WHERE 1=1';
+    const countParams = [];
+
+    if (status) {
+      countSql += ' AND b.status = ?';
+      countParams.push(status);
+    }
+    if (housekeeper) {
+      countSql += ' AND b.housekeeperId = ?';
+      countParams.push(housekeeper);
+    }
+    if (customer) {
+      countSql += ' AND b.customerId = ?';
+      countParams.push(customer);
+    }
+    if (date) {
+      countSql += ' AND DATE(b.startDate) = ?';
+      countParams.push(date);
+    }
+    if (month && year) {
+      countSql += ' AND MONTH(b.startDate) = ? AND YEAR(b.startDate) = ?';
+      countParams.push(month, year);
+    } else if (year) {
+      countSql += ' AND YEAR(b.startDate) = ?';
+      countParams.push(year);
+    }
+
+    db.query(countSql, countParams, (err, countResults) => {
+      if (err) {
+        console.log('Count SQL Error:', err);
+        return res.status(500).json({ error: err });
+      }
+
+      const total = countResults[0].total;
+      const totalPages = Math.ceil(total / limit);
+
+      res.json({
+        bookings: results,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: totalPages,
+          totalBookings: total,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        }
+      });
+    });
+  });
+});
+
 // API: Đặt lịch
 app.post('/api/bookings', (req, res) => {
   const { 
@@ -477,9 +668,31 @@ app.post('/api/bookings', (req, res) => {
 // API: Housekeeper xác nhận booking
 app.post('/api/bookings/:id/confirm', (req, res) => {
   const bookingId = req.params.id;
+  const { housekeeperId } = req.body; // Lấy housekeeperId từ request body
   
-  // Update booking status to confirmed
-  db.query('UPDATE bookings SET status = ? WHERE id = ?', ['confirmed', bookingId], (err, result) => {
+  // Kiểm tra trạng thái xác minh và phê duyệt của housekeeper trước khi cho phép xác nhận
+  db.query('SELECT u.isVerified, u.isApproved FROM users u JOIN bookings b ON u.id = b.housekeeperId WHERE b.id = ?', 
+    [bookingId], (verifyErr, verifyResults) => {
+    if (verifyErr) {
+      console.error('Error checking housekeeper verification:', verifyErr);
+      return res.status(500).json({ error: 'Lỗi kiểm tra trạng thái xác minh' });
+    }
+    
+    if (verifyResults.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy booking' });
+    }
+    
+    const housekeeper = verifyResults[0];
+    if (!housekeeper.isVerified || !housekeeper.isApproved) {
+      return res.status(403).json({ 
+        error: 'Bạn cần được xác minh và phê duyệt bởi admin trước khi có thể xác nhận booking',
+        needsVerification: !housekeeper.isVerified,
+        needsApproval: !housekeeper.isApproved
+      });
+    }
+    
+    // Update booking status to confirmed
+    db.query('UPDATE bookings SET status = ? WHERE id = ?', ['confirmed', bookingId], (err, result) => {
     if (err) {
       console.error('Error confirming booking:', err);
       return res.status(500).json({ error: err });
@@ -531,6 +744,7 @@ app.post('/api/bookings/:id/confirm', (req, res) => {
 
       res.json({ message: 'Booking confirmed successfully', booking: booking });
     });
+  });
   });
 });
 
@@ -978,8 +1192,8 @@ app.put('/api/debug/fix-booking-customer/:bookingId', (req, res) => {
 // API: Thống kê tổng quan hệ thống
 app.get('/api/admin/dashboard/overview', (req, res) => {
   const queries = [
-    // Tổng số users
-    'SELECT COUNT(*) as totalUsers FROM users',
+    // Tổng số users (không tính admin)
+    'SELECT COUNT(*) as totalUsers FROM users WHERE role != "admin"',
     // Tổng số housekeepers
     'SELECT COUNT(*) as totalHousekeepers FROM users WHERE role = "housekeeper"',
     // Tổng số customers
@@ -1189,6 +1403,24 @@ app.put('/api/admin/housekeepers/:userId/status', (req, res) => {
       return res.status(404).json({ error: 'Housekeeper not found' });
     }
     
+    // Lấy thông tin housekeeper để gửi WebSocket event
+    db.query('SELECT fullName FROM users WHERE id = ?', [userId], (nameErr, nameResults) => {
+      if (!nameErr && nameResults.length > 0) {
+        const housekeeperName = nameResults[0].fullName;
+        
+        // Gửi WebSocket event để cập nhật real-time cho tất cả clients
+        io.emit('housekeeper_status_updated', {
+          userId: userId,
+          housekeeperName: housekeeperName,
+          isApproved: isApproved,
+          isVerified: isVerified,
+          timestamp: new Date().toISOString()
+        });
+        
+        console.log(`📡 WebSocket event sent: housekeeper_status_updated for ${housekeeperName}`);
+      }
+    });
+    
     res.json({ 
       message: 'Housekeeper status updated successfully',
       userId: userId,
@@ -1209,9 +1441,29 @@ app.post('/api/bookings/:id/complete', (req, res) => {
   
   console.log(`🏁 Housekeeper ${housekeeperId} marking booking ${bookingId} as completed`);
   
-  // Cập nhật booking status thành completed
-  db.query('UPDATE bookings SET status = ?, updatedAt = NOW() WHERE id = ? AND housekeeperId = ?', 
-    ['completed', bookingId, housekeeperId], (err, result) => {
+  // Kiểm tra trạng thái xác minh và phê duyệt của housekeeper trước khi cho phép đánh dấu hoàn thành
+  db.query('SELECT isVerified, isApproved FROM users WHERE id = ?', [housekeeperId], (verifyErr, verifyResults) => {
+    if (verifyErr) {
+      console.error('Error checking housekeeper verification:', verifyErr);
+      return res.status(500).json({ error: 'Lỗi kiểm tra trạng thái xác minh' });
+    }
+    
+    if (verifyResults.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy housekeeper' });
+    }
+    
+    const housekeeper = verifyResults[0];
+    if (!housekeeper.isVerified || !housekeeper.isApproved) {
+      return res.status(403).json({ 
+        error: 'Bạn cần được xác minh và phê duyệt bởi admin trước khi có thể đánh dấu công việc hoàn thành',
+        needsVerification: !housekeeper.isVerified,
+        needsApproval: !housekeeper.isApproved
+      });
+    }
+    
+    // Cập nhật booking status thành completed
+    db.query('UPDATE bookings SET status = ?, updatedAt = NOW() WHERE id = ? AND housekeeperId = ?', 
+      ['completed', bookingId, housekeeperId], (err, result) => {
     if (err) {
       console.error('Error completing booking:', err);
       return res.status(500).json({ error: err.message });
@@ -1280,6 +1532,7 @@ app.post('/api/bookings/:id/complete', (req, res) => {
         paymentRequired: true
       });
     });
+  });
   });
 });
 
@@ -1403,6 +1656,97 @@ app.get('/api/bookings/:id/payment', (req, res) => {
     }
     
     res.json(results[0]);
+  });
+});
+
+// ========================
+// REVIEWS MANAGEMENT APIs
+// ========================
+
+// API: Lấy tất cả reviews (cho admin)
+app.get('/api/admin/reviews', (req, res) => {
+  const sql = `
+    SELECT r.*, 
+           u1.fullName as customerName, u1.email as customerEmail,
+           u2.fullName as housekeeperName, u2.email as housekeeperEmail,
+           b.notes as service, b.startDate as bookingDate
+    FROM reviews r
+    JOIN users u1 ON r.customerId = u1.id
+    JOIN housekeepers h ON r.housekeeperId = h.id
+    JOIN users u2 ON h.userId = u2.id
+    LEFT JOIN bookings b ON r.bookingId = b.id
+    ORDER BY r.createdAt DESC
+  `;
+  
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Error fetching reviews:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    res.json(results);
+  });
+});
+
+// API: Lấy reviews của một housekeeper cụ thể
+app.get('/api/housekeepers/:id/reviews', (req, res) => {
+  const housekeeperId = req.params.id;
+  
+  const sql = `
+    SELECT r.*, 
+           u.fullName as customerName,
+           b.notes as service, b.startDate as bookingDate
+    FROM reviews r
+    JOIN users u ON r.customerId = u.id
+    LEFT JOIN bookings b ON r.bookingId = b.id
+    WHERE r.housekeeperId = ? AND r.isVisible = 1
+    ORDER BY r.createdAt DESC
+  `;
+  
+  db.query(sql, [housekeeperId], (err, results) => {
+    if (err) {
+      console.error('Error fetching housekeeper reviews:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    res.json(results);
+  });
+});
+
+// API: Xóa review (cho admin)
+app.delete('/api/admin/reviews/:id', (req, res) => {
+  const reviewId = req.params.id;
+  
+  db.query('DELETE FROM reviews WHERE id = ?', [reviewId], (err, result) => {
+    if (err) {
+      console.error('Error deleting review:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    
+    res.json({ message: 'Review deleted successfully' });
+  });
+});
+
+// API: Ẩn/hiện review (cho admin)
+app.put('/api/admin/reviews/:id/visibility', (req, res) => {
+  const reviewId = req.params.id;
+  const { visible } = req.body;
+  
+  db.query('UPDATE reviews SET isVisible = ? WHERE id = ?', [visible ? 1 : 0, reviewId], (err, result) => {
+    if (err) {
+      console.error('Error updating review visibility:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    
+    res.json({ message: 'Review visibility updated successfully' });
   });
 });
 

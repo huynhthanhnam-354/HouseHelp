@@ -51,7 +51,21 @@ function ProfileView({ user, profileData, loading, editing, onEdit, onCancel, on
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <>
+      <style>{`
+        .profile-container .text-gray-600,
+        .profile-container .text-sm.text-gray-600,
+        .profile-container span.text-gray-600,
+        .profile-container span.text-sm {
+          color: #000000 !important;
+          font-weight: 600 !important;
+          background: transparent !important;
+        }
+        .profile-container .space-y-3 span {
+          color: #000000 !important;
+        }
+      `}</style>
+      <div className="min-h-screen bg-gray-50 py-8 profile-container">
       <div className="max-w-6xl mx-auto px-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="flex">
@@ -111,22 +125,22 @@ function ProfileView({ user, profileData, loading, editing, onEdit, onCancel, on
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Stats</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Rating</span>
+                      <span className="text-sm" style={{color: '#000000', fontWeight: '600'}}>Rating</span>
                       <div className="flex items-center gap-1">
                         <svg className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                         </svg>
-                        <span className="text-sm font-semibold">4.8</span>
+                        <span className="text-sm font-semibold">{profileData?.housekeeper?.rating || '0.0'}</span>
                       </div>
                     </div>
                     
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Jobs Completed</span>
-                      <span className="text-sm font-semibold">127</span>
+                      <span className="text-sm" style={{color: '#000000', fontWeight: '600'}}>Jobs Completed</span>
+                      <span className="text-sm font-semibold">{profileData?.housekeeper?.completedJobs || 0}</span>
                     </div>
                     
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Hourly Rate</span>
+                      <span className="text-sm" style={{color: '#000000', fontWeight: '600'}}>Hourly Rate</span>
                       <span className="text-sm font-semibold text-green-600">
                         ${profileData?.housekeeper?.price || 25}/hr
                       </span>
@@ -281,7 +295,8 @@ function ProfileView({ user, profileData, loading, editing, onEdit, onCancel, on
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

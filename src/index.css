@@ -129,3 +129,18 @@ button:focus-visible {
     font-size: 20px;
   }
 }
+
+/* Fix for Profile Quick Stats text visibility - ONLY FOR PROFILE PAGE */
+[data-page="profile"] .text-gray-600,
+[data-page="profile"] .text-sm.text-gray-600 {
+  color: #000000 !important;
+  font-weight: 600 !important;
+  background: transparent !important;
+}
+
+/* Specific fix for profile page URL */
+body[data-url*="/profile"] .text-gray-600,
+body[data-url*="/profile"] .text-sm {
+  color: #000000 !important;
+  font-weight: 600 !important;
+}

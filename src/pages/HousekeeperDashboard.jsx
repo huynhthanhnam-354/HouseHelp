@@ -15,6 +15,32 @@ export default function HousekeeperDashboard() {
   const [pendingBookings, setPendingBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [verificationStatus, setVerificationStatus] = useState({ isVerified: true, isApproved: true });
+
+  // Kiểm tra trạng thái xác minh của housekeeper
+  useEffect(() => {
+    const checkVerificationStatus = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const response = await fetch(`http://localhost:5000/api/admin/housekeepers/status`);
+        if (response.ok) {
+          const housekeepers = await response.json();
+          const currentHousekeeper = housekeepers.find(hk => hk.id === user.id);
+          if (currentHousekeeper) {
+            setVerificationStatus({
+              isVerified: currentHousekeeper.isVerified,
+              isApproved: currentHousekeeper.isApproved
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error checking verification status:', error);
+      }
+    };
+
+    checkVerificationStatus();
+  }, [user?.id, refreshTrigger]);
 
   // Fetch bookings từ database thay vì dựa vào notifications
   useEffect(() => {
@@ -59,8 +85,13 @@ export default function HousekeeperDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({
+          housekeeperId: user.id
+        })
       });
+
+      const result = await response.json();
 
       if (response.ok) {
         // Backend API đã tự động gửi notification rồi, không cần gửi thêm ở đây
@@ -90,7 +121,8 @@ export default function HousekeeperDashboard() {
         
         alert('Đã xác nhận đơn đặt lịch thành công!');
       } else {
-        throw new Error('Không thể xác nhận đơn đặt lịch');
+        // Hiển thị thông báo lỗi nếu chưa được xác minh/phê duyệt
+        alert(result.error || 'Không thể xác nhận booking');
       }
     } catch (error) {
       console.error('Error confirming booking:', error);
@@ -184,6 +216,24 @@ export default function HousekeeperDashboard() {
         <h1>Dashboard Người Giúp Việc</h1>
         <p>Xin chào, <strong>{user?.fullName}</strong>!</p>
       </div>
+
+      {/* Thông báo trạng thái xác minh */}
+      {(!verificationStatus.isVerified || !verificationStatus.isApproved) && (
+        <div className="verification-warning">
+          <div className="warning-card">
+            <h3>⚠️ Tài khoản chưa được xác minh</h3>
+            <p>
+              {!verificationStatus.isVerified && !verificationStatus.isApproved 
+                ? "Tài khoản của bạn chưa được xác minh và phê duyệt bởi admin. Bạn không thể xác nhận booking hoặc đánh dấu công việc hoàn thành."
+                : !verificationStatus.isVerified 
+                ? "Tài khoản của bạn chưa được xác minh bởi admin. Vui lòng chờ admin xác minh."
+                : "Tài khoản của bạn chưa được phê duyệt bởi admin. Vui lòng chờ admin phê duyệt."
+              }
+            </p>
+            <p>Vui lòng liên hệ admin để được hỗ trợ.</p>
+          </div>
+        </div>
+      )}
 
       <div className="pending-bookings-section">
         <h2>Đơn đặt lịch chờ xác nhận ({pendingBookings.length})</h2>

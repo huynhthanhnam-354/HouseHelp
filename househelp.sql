@@ -395,6 +395,9 @@ WHERE EXISTS (
     WHERE p.bookingId = b.id AND p.status = 'success'
 );
 
+-- Cập nhật trạng thái xác minh cho các housekeeper mẫu (để test)
+UPDATE users SET isVerified = 1, isApproved = 1 WHERE role = 'housekeeper';
+
 -- Kiểm tra kết quả cập nhật
 SELECT 'PAYMENT STATUS UPDATE' as info, 
        id, status, paymentStatus, totalPrice 

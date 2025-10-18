@@ -9,8 +9,11 @@ const AdminDashboard = () => {
   const [serviceStats, setServiceStats] = useState([]);
   const [housekeeperStatus, setHousekeeperStatus] = useState([]);
   const [userGrowth, setUserGrowth] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('dashboard');
+  const [selectedHousekeeper, setSelectedHousekeeper] = useState(null);
+  const [showHousekeeperModal, setShowHousekeeperModal] = useState(false);
 
   useEffect(() => {
     fetchAllData();
@@ -26,7 +29,8 @@ const AdminDashboard = () => {
         timeStatsRes,
         serviceStatsRes,
         housekeeperStatusRes,
-        userGrowthRes
+        userGrowthRes,
+        reviewsRes
       ] = await Promise.all([
         fetch('http://localhost:5000/api/admin/dashboard/overview'),
         fetch('http://localhost:5000/api/admin/dashboard/booking-stats'),
@@ -34,7 +38,8 @@ const AdminDashboard = () => {
         fetch('http://localhost:5000/api/admin/dashboard/time-stats'),
         fetch('http://localhost:5000/api/admin/dashboard/service-stats'),
         fetch('http://localhost:5000/api/admin/housekeepers/status'),
-        fetch('http://localhost:5000/api/admin/dashboard/user-growth')
+        fetch('http://localhost:5000/api/admin/dashboard/user-growth'),
+        fetch('http://localhost:5000/api/admin/reviews')
       ]);
 
       setOverview(await overviewRes.json());
@@ -44,6 +49,7 @@ const AdminDashboard = () => {
       setServiceStats(await serviceStatsRes.json());
       setHousekeeperStatus(await housekeeperStatusRes.json());
       setUserGrowth(await userGrowthRes.json());
+      setReviews(await reviewsRes.json());
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
@@ -67,6 +73,61 @@ const AdminDashboard = () => {
       }
     } catch (error) {
       console.error('Error updating housekeeper status:', error);
+    }
+  };
+
+  const viewHousekeeperDetails = async (housekeeper) => {
+    try {
+      // Fetch detailed housekeeper info
+      const response = await fetch(`http://localhost:5000/api/housekeepers/${housekeeper.id}`);
+      if (response.ok) {
+        const detailedInfo = await response.json();
+        setSelectedHousekeeper({ ...housekeeper, ...detailedInfo });
+        setShowHousekeeperModal(true);
+      }
+    } catch (error) {
+      console.error('Error fetching housekeeper details:', error);
+      // Fallback to basic info
+      setSelectedHousekeeper(housekeeper);
+      setShowHousekeeperModal(true);
+    }
+  };
+
+  const toggleReviewVisibility = async (reviewId, visible) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/reviews/${reviewId}/visibility`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ visible }),
+      });
+
+      if (response.ok) {
+        // Refresh reviews data
+        const reviewsRes = await fetch('http://localhost:5000/api/admin/reviews');
+        setReviews(await reviewsRes.json());
+      }
+    } catch (error) {
+      console.error('Error updating review visibility:', error);
+    }
+  };
+
+  const deleteReview = async (reviewId) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa đánh giá này không?')) {
+      try {
+        const response = await fetch(`http://localhost:5000/api/admin/reviews/${reviewId}`, {
+          method: 'DELETE',
+        });
+
+        if (response.ok) {
+          // Refresh reviews data
+          const reviewsRes = await fetch('http://localhost:5000/api/admin/reviews');
+          setReviews(await reviewsRes.json());
+        }
+      } catch (error) {
+        console.error('Error deleting review:', error);
+      }
     }
   };
 
@@ -268,6 +329,13 @@ const AdminDashboard = () => {
             <span className="nav-icon">📈</span>
             Phân tích
           </button>
+          <button 
+            className={`nav-item ${activeSection === 'reviews' ? 'active' : ''}`}
+            onClick={() => setActiveSection('reviews')}
+          >
+            <span className="nav-icon">⭐</span>
+            Đánh giá
+          </button>
         </nav>
       </div>
 
@@ -281,6 +349,7 @@ const AdminDashboard = () => {
               {activeSection === 'users' && '👥 Quản lý Người dùng'}
               {activeSection === 'bookings' && '📅 Quản lý Đặt lịch'}
               {activeSection === 'analytics' && '📈 Phân tích & Báo cáo'}
+              {activeSection === 'reviews' && '⭐ Quản lý Đánh giá'}
             </h1>
             <p>Chào mừng trở lại! Đây là tổng quan hệ thống của bạn.</p>
           </div>
@@ -298,7 +367,7 @@ const AdminDashboard = () => {
                 <div className="stat-icon">👥</div>
                 <div className="stat-content">
                   <h3>Tổng người dùng</h3>
-                  <p className="stat-number">{overview.totalUsers}</p>
+                  <p className="stat-number">{overview.totalUsers || 0}</p>
                   <span className="stat-change">+12% từ tháng trước</span>
                 </div>
               </div>
@@ -307,8 +376,17 @@ const AdminDashboard = () => {
                 <div className="stat-icon">🏠</div>
                 <div className="stat-content">
                   <h3>Người giúp việc</h3>
-                  <p className="stat-number">{overview.totalHousekeepers}</p>
+                  <p className="stat-number">{overview.totalHousekeepers || 0}</p>
                   <span className="stat-change">+8% từ tháng trước</span>
+                </div>
+              </div>
+
+              <div className="stat-card info">
+                <div className="stat-icon">👤</div>
+                <div className="stat-content">
+                  <h3>Người sử dụng dịch vụ</h3>
+                  <p className="stat-number">{overview.totalCustomers || 0}</p>
+                  <span className="stat-change">+10% từ tháng trước</span>
                 </div>
               </div>
               
@@ -316,7 +394,7 @@ const AdminDashboard = () => {
                 <div className="stat-icon">📅</div>
                 <div className="stat-content">
                   <h3>Đặt lịch hôm nay</h3>
-                  <p className="stat-number">{overview.todayBookings}</p>
+                  <p className="stat-number">{overview.todayBookings || 0}</p>
                   <span className="stat-change">+15% từ hôm qua</span>
                 </div>
               </div>
@@ -425,6 +503,13 @@ const AdminDashboard = () => {
                       <td>
                         <div className="action-buttons">
                           <button
+                            className="action-btn info"
+                            onClick={() => viewHousekeeperDetails(hk)}
+                            title="Xem chi tiết thông tin"
+                          >
+                            Chi tiết
+                          </button>
+                          <button
                             className={`action-btn ${hk.isVerified ? 'danger' : 'success'}`}
                             onClick={() => updateHousekeeperStatus(hk.id, hk.isApproved, !hk.isVerified)}
                           >
@@ -509,6 +594,248 @@ const AdminDashboard = () => {
                   </table>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Housekeeper Detail Modal */}
+        {showHousekeeperModal && selectedHousekeeper && (
+          <div className="modal-overlay" onClick={() => setShowHousekeeperModal(false)}>
+            <div className="modal-content housekeeper-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>📋 Thông tin chi tiết người giúp việc</h2>
+                <button 
+                  className="modal-close"
+                  onClick={() => setShowHousekeeperModal(false)}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="modal-body">
+                <div className="housekeeper-profile">
+                  {/* Basic Info */}
+                  <div className="profile-section">
+                    <h3>👤 Thông tin cơ bản</h3>
+                    <div className="info-grid">
+                      <div className="info-item">
+                        <label>Họ tên:</label>
+                        <span>{selectedHousekeeper.fullName}</span>
+                      </div>
+                      <div className="info-item">
+                        <label>Email:</label>
+                        <span>{selectedHousekeeper.email}</span>
+                      </div>
+                      <div className="info-item">
+                        <label>Số điện thoại:</label>
+                        <span>{selectedHousekeeper.phone}</span>
+                      </div>
+                      <div className="info-item">
+                        <label>Kinh nghiệm:</label>
+                        <span>{selectedHousekeeper.experience || 'N/A'} năm</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Work Info */}
+                  <div className="profile-section">
+                    <h3>💼 Thông tin công việc</h3>
+                    <div className="info-grid">
+                      <div className="info-item">
+                        <label>Giá dịch vụ:</label>
+                        <span>{formatCurrency(selectedHousekeeper.price || 0)}/giờ</span>
+                      </div>
+                      <div className="info-item">
+                        <label>Đánh giá:</label>
+                        <span>⭐ {selectedHousekeeper.rating || 0}/5 ({selectedHousekeeper.totalReviews || 0} đánh giá)</span>
+                      </div>
+                      <div className="info-item">
+                        <label>Công việc hoàn thành:</label>
+                        <span>{selectedHousekeeper.completedJobs || 0} công việc</span>
+                      </div>
+                      <div className="info-item">
+                        <label>Trạng thái:</label>
+                        <span className={selectedHousekeeper.available ? 'status-available' : 'status-unavailable'}>
+                          {selectedHousekeeper.available ? '🟢 Sẵn sàng' : '🔴 Bận'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Services */}
+                  <div className="profile-section">
+                    <h3>🛠️ Dịch vụ cung cấp</h3>
+                    <div className="services-list">
+                      {selectedHousekeeper.services ? 
+                        selectedHousekeeper.services.split(',').map((service, index) => (
+                          <span key={index} className="service-tag">{service.trim()}</span>
+                        )) : 
+                        <span>Chưa có thông tin</span>
+                      }
+                    </div>
+                  </div>
+
+                  {/* Skills */}
+                  {selectedHousekeeper.skills && (
+                    <div className="profile-section">
+                      <h3>💪 Kỹ năng</h3>
+                      <div className="skills-list">
+                        {JSON.parse(selectedHousekeeper.skills || '[]').map((skill, index) => (
+                          <span key={index} className="skill-tag">{skill}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {selectedHousekeeper.description && (
+                    <div className="profile-section">
+                      <h3>📝 Mô tả</h3>
+                      <p className="description-text">{selectedHousekeeper.description}</p>
+                    </div>
+                  )}
+
+                  {/* Verification Status */}
+                  <div className="profile-section">
+                    <h3>✅ Trạng thái xác minh</h3>
+                    <div className="verification-status">
+                      <div className={`status-item ${selectedHousekeeper.isVerified ? 'verified' : 'unverified'}`}>
+                        {selectedHousekeeper.isVerified ? '✅' : '❌'} Xác minh danh tính
+                      </div>
+                      <div className={`status-item ${selectedHousekeeper.isApproved ? 'approved' : 'unapproved'}`}>
+                        {selectedHousekeeper.isApproved ? '✅' : '❌'} Phê duyệt hoạt động
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <div className="modal-actions">
+                  <button
+                    className={`action-btn ${selectedHousekeeper.isVerified ? 'danger' : 'success'}`}
+                    onClick={() => {
+                      updateHousekeeperStatus(selectedHousekeeper.id, selectedHousekeeper.isApproved, !selectedHousekeeper.isVerified);
+                      setShowHousekeeperModal(false);
+                    }}
+                  >
+                    {selectedHousekeeper.isVerified ? 'Hủy xác minh' : 'Xác minh'}
+                  </button>
+                  <button
+                    className={`action-btn ${selectedHousekeeper.isApproved ? 'danger' : 'success'}`}
+                    onClick={() => {
+                      updateHousekeeperStatus(selectedHousekeeper.id, !selectedHousekeeper.isApproved, selectedHousekeeper.isVerified);
+                      setShowHousekeeperModal(false);
+                    }}
+                  >
+                    {selectedHousekeeper.isApproved ? 'Hủy duyệt' : 'Phê duyệt'}
+                  </button>
+                  <button
+                    className="action-btn secondary"
+                    onClick={() => setShowHousekeeperModal(false)}
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reviews Management */}
+        {activeSection === 'reviews' && (
+          <div className="reviews-content">
+            <div className="reviews-table-container">
+              <table className="reviews-table">
+                <thead>
+                  <tr>
+                    <th>Khách hàng</th>
+                    <th>Người giúp việc</th>
+                    <th>Dịch vụ</th>
+                    <th>Đánh giá</th>
+                    <th>Nội dung</th>
+                    <th>Ngày tạo</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reviews.map((review) => (
+                    <tr key={review.id}>
+                      <td>
+                        <div className="user-info">
+                          <div className="user-name">{review.customerName}</div>
+                          <div className="user-email">{review.customerEmail}</div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="user-info">
+                          <div className="user-name">{review.housekeeperName}</div>
+                          <div className="user-email">{review.housekeeperEmail}</div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="service-tag">{review.service || 'N/A'}</span>
+                      </td>
+                      <td>
+                        <div className="rating-display">
+                          <span className="rating-stars">
+                            {'⭐'.repeat(review.rating)}
+                          </span>
+                          <span className="rating-number">({review.rating}/5)</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="review-content">
+                          {review.comment ? (
+                            <span title={review.comment}>
+                              {review.comment.length > 50 
+                                ? `${review.comment.substring(0, 50)}...` 
+                                : review.comment}
+                            </span>
+                          ) : (
+                            <span className="no-comment">Không có bình luận</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="date-text">
+                          {new Date(review.createdAt).toLocaleDateString('vi-VN')}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`status-badge ${review.isVisible ? 'visible' : 'hidden'}`}>
+                          {review.isVisible ? '👁️ Hiển thị' : '🙈 Ẩn'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button
+                            className={`action-btn ${review.isVisible ? 'warning' : 'success'}`}
+                            onClick={() => toggleReviewVisibility(review.id, !review.isVisible)}
+                          >
+                            {review.isVisible ? 'Ẩn' : 'Hiện'}
+                          </button>
+                          <button
+                            className="action-btn danger"
+                            onClick={() => deleteReview(review.id)}
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              
+              {reviews.length === 0 && (
+                <div className="empty-state">
+                  <div className="empty-icon">⭐</div>
+                  <h3>Chưa có đánh giá nào</h3>
+                  <p>Các đánh giá từ khách hàng sẽ hiển thị ở đây.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
