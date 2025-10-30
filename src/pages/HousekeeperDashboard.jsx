@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 import translations from '../locales/translations';
 import BookingCompletion from '../components/BookingCompletion';
 import './HousekeeperDashboard.css';
@@ -10,9 +11,11 @@ export default function HousekeeperDashboard() {
   const { user } = useAuth();
   const { notifications, markAsRead } = useNotifications();
   const { language } = useLanguage();
+  const navigate = useNavigate();
   const t = translations[language];
   
   const [pendingBookings, setPendingBookings] = useState([]);
+  const [confirmedBookings, setConfirmedBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [verificationStatus, setVerificationStatus] = useState({ isVerified: true, isApproved: true });
@@ -53,19 +56,23 @@ export default function HousekeeperDashboard() {
         if (response.ok) {
           const allBookings = await response.json();
           
-              // Lọc bookings cho housekeeper (pending và confirmed)
+              // Lọc bookings cho housekeeper
               const housekeeperBookings = allBookings.filter(booking =>
-                booking.housekeeperId === user.id &&
-                (booking.status === 'pending' || booking.status === 'confirmed')
+                booking.housekeeperId === user.id
               );
 
-              // Sắp xếp booking theo thời gian tạo mới nhất lên đầu
-              const sortedBookings = housekeeperBookings.sort((a, b) => {
-                return new Date(b.createdAt) - new Date(a.createdAt);
-              });
+              // Phân loại theo status
+              const pending = housekeeperBookings.filter(booking => booking.status === 'pending');
+              const confirmed = housekeeperBookings.filter(booking => booking.status === 'confirmed');
 
-              console.log('Housekeeper bookings (sorted):', sortedBookings);
-              setPendingBookings(sortedBookings);
+              // Sắp xếp theo thời gian tạo mới nhất lên đầu
+              const sortedPending = pending.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+              const sortedConfirmed = confirmed.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+              console.log('Pending bookings:', sortedPending);
+              console.log('Confirmed bookings:', sortedConfirmed);
+              setPendingBookings(sortedPending);
+              setConfirmedBookings(sortedConfirmed);
         }
       } catch (error) {
         console.error('Error fetching housekeeper bookings:', error);
@@ -308,6 +315,13 @@ export default function HousekeeperDashboard() {
 
                 <div className="booking-actions">
                   <button
+                    className="chat-btn"
+                    onClick={() => navigate('/chat')}
+                    title="Nhắn tin với khách hàng"
+                  >
+                    💬 Chat
+                  </button>
+                  <button
                     className="reject-btn"
                     onClick={() => handleRejectBooking(booking)}
                     disabled={loading}
@@ -320,6 +334,110 @@ export default function HousekeeperDashboard() {
                     disabled={loading}
                   >
                     {loading ? 'Đang xử lý...' : 'Xác nhận'}
+                  </button>
+                </div>
+
+                {/* Booking Completion Component */}
+                <BookingCompletion 
+                  booking={booking} 
+                  onStatusUpdate={() => setRefreshTrigger(prev => prev + 1)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Confirmed Bookings Section */}
+      <div className="confirmed-bookings-section">
+        <h2>Đơn đặt lịch đã xác nhận ({confirmedBookings.length})</h2>
+        
+        {confirmedBookings.length === 0 ? (
+          <div className="no-bookings">
+            <div className="no-bookings-icon">✅</div>
+            <p>Không có đơn đặt lịch nào đã xác nhận</p>
+          </div>
+        ) : (
+          <div className="bookings-list">
+            {confirmedBookings.map((booking, index) => (
+              <div key={booking.id} className={`booking-card confirmed-booking ${index === 0 ? 'newest-booking' : ''}`}>
+                <div className="booking-header">
+                  <div className="customer-info">
+                    <div className="customer-avatar">
+                      {booking.customerName?.charAt(0) || 'C'}
+                    </div>
+                    <div className="customer-details">
+                      <h3>
+                        <button 
+                          className="booking-link"
+                          onClick={() => navigate(`/booking-view/${booking.id}`)}
+                        >
+                          {booking.customerName} (#{booking.id}) 
+                          <span className="status-badge confirmed">ĐÃ XÁC NHẬN</span>
+                        </button>
+                      </h3>
+                      <p>{booking.customerPhone}</p>
+                      <p>{booking.customerEmail}</p>
+                    </div>
+                  </div>
+                  <div className="booking-time">
+                    <span className="time-received">
+                      Xác nhận lúc: {formatTime(booking.updatedAt || booking.createdAt)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="booking-details">
+                  <div className="detail-row">
+                    <span className="label">Dịch vụ:</span>
+                    <span className="value">{booking.service}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="label">Ngày:</span>
+                    <span className="value">{formatDate(booking.date)}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="label">Giờ:</span>
+                    <span className="value">{booking.time}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="label">Thời gian:</span>
+                    <span className="value">{booking.duration} giờ</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="label">Địa điểm:</span>
+                    <span className="value">{booking.location}</span>
+                  </div>
+                  <div className="detail-row price">
+                    <span className="label">Tổng tiền:</span>
+                    <span className="value">${booking.totalPrice}</span>
+                  </div>
+                </div>
+
+                {booking.notes && (
+                  <div className="booking-notes">
+                    <h4>Ghi chú:</h4>
+                    <p>{booking.notes}</p>
+                  </div>
+                )}
+
+                {/* Chỉ hiển thị Chat và Hoàn thành cho booking đã xác nhận */}
+                <div className="booking-actions confirmed-actions">
+                  <button
+                    className="chat-btn"
+                    onClick={() => navigate('/chat')}
+                    title="Nhắn tin với khách hàng"
+                  >
+                    💬 Chat
+                  </button>
+                  <button
+                    className="complete-btn"
+                    onClick={() => {
+                      // Logic đánh dấu hoàn thành sẽ được xử lý bởi BookingCompletion component
+                    }}
+                    title="Đánh dấu công việc hoàn thành"
+                  >
+                    ✅ Hoàn thành
                   </button>
                 </div>
 

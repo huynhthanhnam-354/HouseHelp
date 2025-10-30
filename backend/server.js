@@ -658,6 +658,32 @@ app.post('/api/bookings', (req, res) => {
         ], (notifErr) => {
           if (notifErr) console.error('Error saving notification:', notifErr);
         });
+
+        // Tạo tin nhắn chào tự động
+        const welcomeMessage = `Xin chào! Tôi đã nhận được yêu cầu đặt lịch dịch vụ ${service} của bạn. Tôi sẽ xác nhận sớm nhất có thể. Cảm ơn bạn đã tin tưởng dịch vụ của chúng tôi! 😊`;
+        
+        const chatSql = `INSERT INTO chat_messages (bookingId, senderId, receiverId, message, messageType, createdAt) VALUES (?, ?, ?, ?, 'text', NOW())`;
+        
+        db.query(chatSql, [bookingId, housekeeperUserId, customerId, welcomeMessage], (chatErr, chatResult) => {
+          if (chatErr) {
+            console.error('Error creating welcome message:', chatErr);
+          } else {
+            console.log('✅ Welcome message created for booking:', bookingId);
+            
+            // Gửi WebSocket event cho tin nhắn chào
+            io.emit('new_message', {
+              id: chatResult.insertId,
+              bookingId: parseInt(bookingId),
+              senderId: housekeeperUserId,
+              receiverId: customerId,
+              message: welcomeMessage,
+              messageType: 'text',
+              senderName: housekeeperName,
+              receiverName: customerName,
+              timestamp: new Date()
+            });
+          }
+        });
       }
     });
 
@@ -1747,6 +1773,451 @@ app.put('/api/admin/reviews/:id/visibility', (req, res) => {
     }
     
     res.json({ message: 'Review visibility updated successfully' });
+  });
+});
+
+// ========================
+// CHAT SYSTEM APIs
+// ========================
+
+// API: Lấy tin nhắn của một booking
+app.get('/api/bookings/:bookingId/messages', (req, res) => {
+  const { bookingId } = req.params;
+  
+  const sql = `
+    SELECT cm.*, 
+           sender.fullName as senderName,
+           receiver.fullName as receiverName
+    FROM chat_messages cm
+    JOIN users sender ON cm.senderId = sender.id
+    JOIN users receiver ON cm.receiverId = receiver.id
+    WHERE cm.bookingId = ?
+    ORDER BY cm.createdAt ASC
+  `;
+  
+  db.query(sql, [bookingId], (err, results) => {
+    if (err) {
+      console.error('Error fetching messages:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    console.log(`💬 Found ${results.length} messages for booking ${bookingId}`);
+    res.json(results);
+  });
+});
+
+// API: Gửi tin nhắn trong booking
+app.post('/api/bookings/:bookingId/messages', (req, res) => {
+  const { bookingId } = req.params;
+  const { senderId, receiverId, message, messageType = 'text' } = req.body;
+  
+  if (!senderId || !receiverId || !message) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  
+  const sql = `
+    INSERT INTO chat_messages (bookingId, senderId, receiverId, message, messageType, createdAt)
+    VALUES (?, ?, ?, ?, ?, NOW())
+  `;
+  
+  db.query(sql, [bookingId, senderId, receiverId, message, messageType], (err, result) => {
+    if (err) {
+      console.error('Error sending message:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    // Lấy tin nhắn vừa tạo với thông tin đầy đủ
+    const selectSql = `
+      SELECT cm.*, 
+             sender.fullName as senderName,
+             receiver.fullName as receiverName
+      FROM chat_messages cm
+      JOIN users sender ON cm.senderId = sender.id
+      JOIN users receiver ON cm.receiverId = receiver.id
+      WHERE cm.id = ?
+    `;
+    
+    db.query(selectSql, [result.insertId], (selectErr, selectResults) => {
+      if (selectErr) {
+        console.error('Error fetching new message:', selectErr);
+        return res.status(500).json({ error: selectErr.message });
+      }
+      
+      const newMessage = selectResults[0];
+      
+      // Gửi WebSocket event
+      io.emit('new_message', {
+        id: newMessage.id,
+        bookingId: parseInt(bookingId),
+        senderId: newMessage.senderId,
+        receiverId: newMessage.receiverId,
+        message: newMessage.message,
+        messageType: newMessage.messageType,
+        senderName: newMessage.senderName,
+        receiverName: newMessage.receiverName,
+        timestamp: newMessage.createdAt
+      });
+      
+      console.log(`📨 New message sent in booking ${bookingId}`);
+      res.json(newMessage);
+    });
+  });
+});
+
+// API: Đánh dấu tin nhắn đã đọc
+app.put('/api/bookings/:bookingId/mark-read', (req, res) => {
+  const { bookingId } = req.params;
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+  
+  const sql = `
+    INSERT INTO chat_read_status (userId, bookingId, lastReadAt) 
+    VALUES (?, ?, NOW()) 
+    ON DUPLICATE KEY UPDATE lastReadAt = NOW()
+  `;
+  
+  db.query(sql, [userId, bookingId], (err, result) => {
+    if (err) {
+      console.error('Error marking messages as read:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    console.log(`✅ Messages marked as read for user ${userId} in booking ${bookingId}`);
+    res.json({ success: true });
+  });
+});
+
+// API: Lấy tin nhắn giữa 2 users (tất cả bookings)
+app.get('/api/users/:userId1/messages/:userId2', (req, res) => {
+  const { userId1, userId2 } = req.params;
+  
+  const sql = `
+    SELECT cm.*, 
+           sender.fullName as senderName,
+           receiver.fullName as receiverName,
+           b.id as bookingId
+    FROM chat_messages cm
+    JOIN users sender ON cm.senderId = sender.id
+    JOIN users receiver ON cm.receiverId = receiver.id
+    JOIN bookings b ON cm.bookingId = b.id
+    WHERE ((cm.senderId = ? AND cm.receiverId = ?) OR (cm.senderId = ? AND cm.receiverId = ?))
+    ORDER BY cm.createdAt ASC
+  `;
+  
+  db.query(sql, [userId1, userId2, userId2, userId1], (err, results) => {
+    if (err) {
+      console.error('Error fetching user messages:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log(`💬 Found ${results.length} messages between users ${userId1} and ${userId2}`);
+    res.json(results);
+  });
+});
+
+// API: Gửi tin nhắn giữa 2 users (tìm booking gần nhất)
+app.post('/api/users/:userId1/messages/:userId2', (req, res) => {
+  const { userId1, userId2 } = req.params;
+  const { message, messageType = 'text' } = req.body;
+  
+  if (!message) {
+    return res.status(400).json({ error: 'Message is required' });
+  }
+  
+  // Tìm booking gần nhất giữa 2 users
+  const findBookingSql = `
+    SELECT b.id, b.customerId, b.housekeeperId, h.userId as housekeeperUserId
+    FROM bookings b
+    LEFT JOIN housekeepers h ON b.housekeeperId = h.id
+    WHERE ((b.customerId = ? AND h.userId = ?) OR (b.customerId = ? AND h.userId = ?))
+    ORDER BY b.createdAt DESC
+    LIMIT 1
+  `;
+  
+  db.query(findBookingSql, [userId1, userId2, userId2, userId1], (err, bookingResults) => {
+    if (err) {
+      console.error('Error finding booking:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (bookingResults.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy booking giữa 2 users này' });
+    }
+    
+    const booking = bookingResults[0];
+    const bookingId = booking.id;
+    
+    // Gửi tin nhắn
+    const insertSql = `
+      INSERT INTO chat_messages (bookingId, senderId, receiverId, message, messageType, createdAt)
+      VALUES (?, ?, ?, ?, ?, NOW())
+    `;
+    
+    db.query(insertSql, [bookingId, userId1, userId2, message, messageType], (insertErr, result) => {
+      if (insertErr) {
+        console.error('Error sending message:', insertErr);
+        return res.status(500).json({ error: insertErr.message });
+      }
+      
+      // Lấy tin nhắn vừa tạo với thông tin đầy đủ
+      const selectSql = `
+        SELECT cm.*, 
+               sender.fullName as senderName,
+               receiver.fullName as receiverName
+        FROM chat_messages cm
+        JOIN users sender ON cm.senderId = sender.id
+        JOIN users receiver ON cm.receiverId = receiver.id
+        WHERE cm.id = ?
+      `;
+      
+      db.query(selectSql, [result.insertId], (selectErr, selectResults) => {
+        if (selectErr) {
+          console.error('Error fetching new message:', selectErr);
+          return res.status(500).json({ error: selectErr.message });
+        }
+        
+        const newMessage = selectResults[0];
+        
+        // Gửi WebSocket event
+        io.emit('new_message', {
+          id: newMessage.id,
+          bookingId: parseInt(bookingId),
+          senderId: newMessage.senderId,
+          receiverId: newMessage.receiverId,
+          message: newMessage.message,
+          messageType: newMessage.messageType,
+          senderName: newMessage.senderName,
+          receiverName: newMessage.receiverName,
+          timestamp: newMessage.createdAt
+        });
+        
+        console.log(`📨 New message sent between users ${userId1} and ${userId2}`);
+        res.json(newMessage);
+      });
+    });
+  });
+});
+
+// API: Lấy danh sách conversations theo user (booking-based)
+app.get('/api/users/:userId/conversations', (req, res) => {
+  const { userId } = req.params;
+  
+  const sql = `
+    SELECT DISTINCT
+      b.id as bookingId,
+      b.service,
+      b.status as bookingStatus,
+      CASE 
+        WHEN b.customerId = ? THEN b.housekeeperId
+        ELSE b.customerId
+      END as otherUserId,
+      CASE 
+        WHEN b.customerId = ? THEN b.housekeeperName
+        ELSE b.customerName
+      END as otherUserName,
+      CASE 
+        WHEN b.customerId = ? THEN 'housekeeper'
+        ELSE 'customer'
+      END as otherUserRole,
+      (SELECT cm.message 
+       FROM chat_messages cm 
+       WHERE cm.bookingId = b.id 
+       ORDER BY cm.createdAt DESC 
+       LIMIT 1) as lastMessage,
+      (SELECT cm.createdAt 
+       FROM chat_messages cm 
+       WHERE cm.bookingId = b.id 
+       ORDER BY cm.createdAt DESC 
+       LIMIT 1) as lastMessageTime,
+      (SELECT COUNT(*) 
+       FROM chat_messages cm 
+       WHERE cm.bookingId = b.id 
+       AND cm.receiverId = ? 
+       AND cm.createdAt > COALESCE(
+         (SELECT lastReadAt FROM chat_read_status WHERE userId = ? AND bookingId = b.id),
+         '1970-01-01'
+       )) as unreadCount
+    FROM bookings b
+    WHERE (b.customerId = ? OR b.housekeeperId = ?)
+    AND EXISTS (SELECT 1 FROM chat_messages cm WHERE cm.bookingId = b.id)
+    ORDER BY lastMessageTime DESC
+  `;
+  
+  db.query(sql, [userId, userId, userId, userId, userId, userId, userId], (err, results) => {
+    if (err) {
+      console.error('Error fetching conversations:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log(`📋 Found ${results.length} conversations for user ${userId}`);
+    res.json(results);
+  });
+});
+
+// API: Lấy danh sách conversations theo user (simplified)
+app.get('/api/users/:userId/user-conversations', (req, res) => {
+  const { userId } = req.params;
+  
+  const sql = `
+    SELECT DISTINCT
+      CASE 
+        WHEN cm.senderId = ? THEN cm.receiverId
+        ELSE cm.senderId
+      END as otherUserId,
+      CASE 
+        WHEN cm.senderId = ? THEN receiver.fullName
+        ELSE sender.fullName
+      END as otherUserName,
+      CASE 
+        WHEN cm.senderId = ? THEN 
+          (SELECT role FROM users WHERE id = cm.receiverId)
+        ELSE 
+          (SELECT role FROM users WHERE id = cm.senderId)
+      END as otherUserRole,
+      (SELECT cm2.message 
+       FROM chat_messages cm2 
+       WHERE ((cm2.senderId = ? AND cm2.receiverId = (CASE WHEN cm.senderId = ? THEN cm.receiverId ELSE cm.senderId END)) OR
+              (cm2.receiverId = ? AND cm2.senderId = (CASE WHEN cm.senderId = ? THEN cm.receiverId ELSE cm.senderId END)))
+       ORDER BY cm2.createdAt DESC 
+       LIMIT 1) as lastMessage,
+      (SELECT cm2.createdAt 
+       FROM chat_messages cm2 
+       WHERE ((cm2.senderId = ? AND cm2.receiverId = (CASE WHEN cm.senderId = ? THEN cm.receiverId ELSE cm.senderId END)) OR
+              (cm2.receiverId = ? AND cm2.senderId = (CASE WHEN cm.senderId = ? THEN cm.receiverId ELSE cm.senderId END)))
+       ORDER BY cm2.createdAt DESC 
+       LIMIT 1) as lastMessageTime
+    FROM chat_messages cm
+    JOIN users sender ON cm.senderId = sender.id
+    JOIN users receiver ON cm.receiverId = receiver.id
+    WHERE (cm.senderId = ? OR cm.receiverId = ?)
+    ORDER BY lastMessageTime DESC
+  `;
+  
+  db.query(sql, [
+    userId, userId, userId, userId, userId, userId, userId,
+    userId, userId, userId, userId, userId, userId
+  ], (err, results) => {
+    if (err) {
+      console.error('Error fetching user conversations:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log(`📋 Found ${results.length} user conversations for user ${userId}`);
+    res.json(results);
+  });
+});
+
+// ========================
+// CHAT SYSTEM APIs - DELETE MESSAGE
+// ========================
+
+// API: Xóa tin nhắn
+app.delete('/api/messages/:messageId', (req, res) => {
+  const { messageId } = req.params;
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+  
+  // Kiểm tra xem tin nhắn có thuộc về user này không
+  const checkSql = 'SELECT * FROM chat_messages WHERE id = ? AND senderId = ?';
+  
+  db.query(checkSql, [messageId, userId], (err, results) => {
+    if (err) {
+      console.error('Error checking message ownership:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (results.length === 0) {
+      return res.status(403).json({ error: 'Bạn chỉ có thể xóa tin nhắn của mình' });
+    }
+    
+    // Xóa tin nhắn
+    const deleteSql = 'DELETE FROM chat_messages WHERE id = ?';
+    
+    db.query(deleteSql, [messageId], (deleteErr, deleteResult) => {
+      if (deleteErr) {
+        console.error('Error deleting message:', deleteErr);
+        return res.status(500).json({ error: deleteErr.message });
+      }
+      
+      if (deleteResult.affectedRows === 0) {
+        return res.status(404).json({ error: 'Tin nhắn không tồn tại' });
+      }
+      
+      // Emit WebSocket event để cập nhật real-time
+      io.emit('message_deleted', {
+        messageId: parseInt(messageId),
+        bookingId: results[0].bookingId,
+        deletedBy: userId
+      });
+      
+      console.log(`🗑️ Message ${messageId} deleted by user ${userId}`);
+      res.json({ success: true, message: 'Tin nhắn đã được xóa' });
+    });
+  });
+});
+
+// API: Xóa toàn bộ cuộc trò chuyện
+app.delete('/api/conversations/:bookingId', (req, res) => {
+  const { bookingId } = req.params;
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+  
+  // Kiểm tra xem user có tin nhắn trong conversation này không
+  const checkSql = `
+    SELECT DISTINCT bookingId 
+    FROM chat_messages 
+    WHERE bookingId = ? AND (senderId = ? OR receiverId = ?)
+    LIMIT 1
+  `;
+  
+  db.query(checkSql, [bookingId, userId, userId], (err, results) => {
+    if (err) {
+      console.error('Error checking conversation ownership:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (results.length === 0) {
+      return res.status(403).json({ error: 'Bạn không có quyền xóa cuộc trò chuyện này' });
+    }
+    
+    // Xóa chat read status trước (nếu bảng tồn tại)
+    const deleteReadStatusSql = 'DELETE FROM chat_read_status WHERE bookingId = ?';
+    
+    db.query(deleteReadStatusSql, [bookingId], (readErr) => {
+      if (readErr) {
+        console.error('Warning: Error deleting read status (table may not exist):', readErr.message);
+        // Không return error, tiếp tục xóa messages
+      }
+      
+      // Xóa tất cả tin nhắn trong conversation
+      const deleteSql = 'DELETE FROM chat_messages WHERE bookingId = ?';
+      
+      db.query(deleteSql, [bookingId], (deleteErr, deleteResult) => {
+        if (deleteErr) {
+          console.error('Error deleting conversation messages:', deleteErr);
+          return res.status(500).json({ error: `Không thể xóa tin nhắn: ${deleteErr.message}` });
+        }
+        
+        // Emit WebSocket event để cập nhật real-time
+        io.emit('conversation_deleted', {
+          bookingId: parseInt(bookingId),
+          deletedBy: userId,
+          messagesDeleted: deleteResult.affectedRows
+        });
+        
+        console.log(`🗑️ Conversation ${bookingId} deleted by user ${userId} (${deleteResult.affectedRows} messages)`);
+        res.json({ 
+          success: true, 
+          message: `Đã xóa cuộc trò chuyện (${deleteResult.affectedRows} tin nhắn)` 
+        });
+      });
+    });
   });
 });
 

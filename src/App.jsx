@@ -8,6 +8,7 @@ import BookingViewPage from "./pages/BookingViewPage";
 import HousekeeperDashboard from "./pages/HousekeeperDashboard";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import ChatPage from "./pages/ChatPage";
 import SettingLanguage from "./views/Setting/SettingLanguage";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { BookingProvider } from "./contexts/BookingContext";
@@ -32,6 +33,7 @@ export default function App() {
               <Route path="/housekeeper/dashboard" element={<HousekeeperDashboard />} />
               <Route path="/customer/dashboard" element={<CustomerDashboard />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/chat" element={<ChatPage />} />
               <Route path="/settings/language" element={<SettingLanguage />} />
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>

@@ -99,6 +99,10 @@ export default function Header({ keyword, setKeyword, onSearch }) {
                   <span className="dropdown-icon">👤</span>
                   {t.profile}
                 </button>
+                <button className="dropdown-item" onClick={() => { navigate("/chat"); setShowDropdown(false); }}>
+                  <span className="dropdown-icon">💬</span>
+                  Tin nhắn
+                </button>
                 {user?.role === 'housekeeper' && (
                   <button className="dropdown-item" onClick={() => { navigate("/housekeeper/dashboard"); setShowDropdown(false); }}>
                     <span className="dropdown-icon">📋</span>

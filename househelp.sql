@@ -1,6 +1,10 @@
--- Set charset
+-- Set charset and SQL mode for compatibility
 SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
+SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
+SET AUTOCOMMIT = 0;
+START TRANSACTION;
+SET time_zone = "+00:00";
 
 -- Drop existing tables
 DROP TABLE IF EXISTS system_logs;
@@ -312,8 +316,8 @@ INSERT INTO bookings (customerId, housekeeperId, serviceId, startDate, endDate, 
 -- Thêm payment records cho các booking completed
 INSERT INTO payments (bookingId, customerId, method, amount, status, transactionCode, paidAt, createdAt) VALUES
 -- Payment cho booking vừa hoàn thành
-((SELECT MAX(id)-1 FROM bookings), 3, 'e_wallet', 300000, 'success', 'PAY_' || UNIX_TIMESTAMP(), NOW(), NOW()),
-((SELECT MAX(id) FROM bookings), 4, 'bank_transfer', 250000, 'success', 'PAY_' || UNIX_TIMESTAMP(), NOW(), NOW()),
+((SELECT MAX(id)-1 FROM bookings), 3, 'e_wallet', 300000, 'success', CONCAT('PAY_', UNIX_TIMESTAMP()), NOW(), NOW()),
+((SELECT MAX(id) FROM bookings), 4, 'bank_transfer', 250000, 'success', CONCAT('PAY_', UNIX_TIMESTAMP()), NOW(), NOW()),
 -- Payment cho booking cũ
 (1, 3, 'cash', 240000, 'success', 'PAY_CASH_001', NOW(), NOW());
 
@@ -359,26 +363,47 @@ INSERT INTO system_logs (userId, action, description, ipAddress, createdAt) VALU
 (4, 'PAYMENT_CONFIRMED', 'Customer xác nhận thanh toán booking', '192.168.1.31', NOW()),
 (5, 'ADMIN_VIEW_STATS', 'Admin xem thống kê doanh thu', '192.168.1.10', NOW());
 
+-- Bảng trạng thái đọc tin nhắn
+CREATE TABLE `chat_read_status` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `userId` int(11) NOT NULL,
+  `bookingId` int(11) NOT NULL,
+  `lastReadAt` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `createdAt` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_booking` (`userId`, `bookingId`),
+  KEY `idx_userId` (`userId`),
+  KEY `idx_bookingId` (`bookingId`),
+  CONSTRAINT `fk_chat_read_user` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_chat_read_booking` FOREIGN KEY (`bookingId`) REFERENCES `bookings` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ========================
--- VERIFICATION QUERIES
+-- VERIFICATION QUERIES  
 -- ========================
 
--- Kiểm tra dữ liệu completion & payment
-SELECT 'BOOKING STATUS' as info, status, COUNT(*) as count FROM bookings GROUP BY status
-UNION ALL
-SELECT 'PAYMENT STATUS', status, COUNT(*) FROM payments GROUP BY status
-UNION ALL
-SELECT 'TOTAL REVENUE', 'success', SUM(amount) FROM payments WHERE status = 'success'
-UNION ALL
-SELECT 'TODAY REVENUE', 'today', SUM(amount) FROM payments WHERE DATE(paidAt) = CURDATE() AND status = 'success'
-UNION ALL
-SELECT 'COMPLETED JOBS', 'housekeeper_1', completedJobs FROM housekeepers WHERE id = 1
-UNION ALL
-SELECT 'COMPLETED JOBS', 'housekeeper_2', completedJobs FROM housekeepers WHERE id = 2
-UNION ALL
-SELECT 'AVG RATING', 'housekeeper_1', rating FROM housekeepers WHERE id = 1
-UNION ALL
-SELECT 'AVG RATING', 'housekeeper_2', rating FROM housekeepers WHERE id = 2;
+-- Kiểm tra dữ liệu completion & payment (queries riêng biệt để tránh lỗi collation)
+
+-- Booking status
+-- SELECT 'BOOKING STATUS' as info, status, COUNT(*) as count FROM bookings GROUP BY status;
+
+-- Payment status  
+-- SELECT 'PAYMENT STATUS' as info, status, COUNT(*) as count FROM payments GROUP BY status;
+
+-- Total revenue
+-- SELECT 'TOTAL REVENUE' as info, 'success' as status, COALESCE(SUM(amount), 0) as count FROM payments WHERE status = 'success';
+
+-- Today revenue
+-- SELECT 'TODAY REVENUE' as info, 'today' as status, COALESCE(SUM(amount), 0) as count FROM payments WHERE DATE(paidAt) = CURRENT_DATE AND status = 'success';
+
+-- Completed jobs
+-- SELECT 'COMPLETED JOBS' as info, 'housekeeper_1' as status, COALESCE(completedJobs, 0) as count FROM housekeepers WHERE id = 1;
+-- SELECT 'COMPLETED JOBS' as info, 'housekeeper_2' as status, COALESCE(completedJobs, 0) as count FROM housekeepers WHERE id = 2;
+
+-- Average ratings
+-- SELECT 'AVG RATING' as info, 'housekeeper_1' as status, COALESCE(rating, 0) as count FROM housekeepers WHERE id = 1;
+-- SELECT 'AVG RATING' as info, 'housekeeper_2' as status, COALESCE(rating, 0) as count FROM housekeepers WHERE id = 2;
 
 -- ========================
 -- DATABASE UPDATE COMMANDS
@@ -404,3 +429,6 @@ SELECT 'PAYMENT STATUS UPDATE' as info,
 FROM bookings 
 WHERE status = 'completed' 
 ORDER BY id DESC;
+
+-- Commit transaction
+COMMIT;
