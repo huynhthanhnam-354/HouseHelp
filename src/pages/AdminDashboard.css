@@ -177,6 +177,57 @@
   margin-bottom: 40px;
 }
 
+/* Housekeeper Statistics Section */
+.housekeeper-stats-section {
+  margin: 40px 0;
+}
+
+.housekeeper-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.housekeeper-stats-section .section-header {
+  margin-bottom: 24px;
+}
+
+.housekeeper-stats-section .section-header h2 {
+  color: #1e293b;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.housekeeper-stats-section .stat-card {
+  transition: all 0.3s ease;
+  border: 1px solid #e2e8f0;
+}
+
+.housekeeper-stats-section .stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+
+.housekeeper-stats-section .stat-card.danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+}
+
+.housekeeper-stats-section .stat-card.danger .stat-icon {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.housekeeper-stats-section .stat-card.danger .stat-change {
+  color: rgba(255, 255, 255, 0.8);
+}
+
 .stat-card {
   background: white;
   padding: 32px;

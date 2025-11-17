@@ -10,6 +10,7 @@ const AdminDashboard = () => {
   const [housekeeperStatus, setHousekeeperStatus] = useState([]);
   const [userGrowth, setUserGrowth] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [housekeeperDetails, setHousekeeperDetails] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('dashboard');
   const [selectedHousekeeper, setSelectedHousekeeper] = useState(null);
@@ -30,7 +31,8 @@ const AdminDashboard = () => {
         serviceStatsRes,
         housekeeperStatusRes,
         userGrowthRes,
-        reviewsRes
+        reviewsRes,
+        housekeeperDetailsRes
       ] = await Promise.all([
         fetch('http://localhost:5000/api/admin/dashboard/overview'),
         fetch('http://localhost:5000/api/admin/dashboard/booking-stats'),
@@ -39,7 +41,8 @@ const AdminDashboard = () => {
         fetch('http://localhost:5000/api/admin/dashboard/service-stats'),
         fetch('http://localhost:5000/api/admin/housekeepers/status'),
         fetch('http://localhost:5000/api/admin/dashboard/user-growth'),
-        fetch('http://localhost:5000/api/admin/reviews')
+        fetch('http://localhost:5000/api/admin/reviews'),
+        fetch('http://localhost:5000/api/admin/dashboard/housekeeper-details')
       ]);
 
       setOverview(await overviewRes.json());
@@ -50,6 +53,7 @@ const AdminDashboard = () => {
       setHousekeeperStatus(await housekeeperStatusRes.json());
       setUserGrowth(await userGrowthRes.json());
       setReviews(await reviewsRes.json());
+      setHousekeeperDetails(await housekeeperDetailsRes.json());
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
@@ -405,6 +409,68 @@ const AdminDashboard = () => {
                   <h3>Doanh thu hôm nay</h3>
                   <p className="stat-number">{formatCurrency(overview.todayRevenue)}</p>
                   <span className="stat-change">+22% từ hôm qua</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Housekeeper Statistics Section */}
+            <div className="housekeeper-stats-section">
+              <div className="section-header">
+                <h2>📊 Thống kê Người giúp việc</h2>
+              </div>
+              <div className="housekeeper-stats-grid">
+                <div className="stat-card success">
+                  <div className="stat-icon">✅</div>
+                  <div className="stat-content">
+                    <h3>Sẵn sàng nhận việc</h3>
+                    <p className="stat-number">{housekeeperDetails.ready || 0}</p>
+                    <span className="stat-change">Đã xác minh & có sẵn</span>
+                  </div>
+                </div>
+
+                <div className="stat-card warning">
+                  <div className="stat-icon">🔄</div>
+                  <div className="stat-content">
+                    <h3>Đang hoạt động</h3>
+                    <p className="stat-number">{housekeeperDetails.available || 0}</p>
+                    <span className="stat-change">Đang mở trạng thái nhận việc</span>
+                  </div>
+                </div>
+
+                <div className="stat-card info">
+                  <div className="stat-icon">✔️</div>
+                  <div className="stat-content">
+                    <h3>Đã xác minh</h3>
+                    <p className="stat-number">{housekeeperDetails.verified || 0}</p>
+                    <span className="stat-change">Đã được admin phê duyệt</span>
+                  </div>
+                </div>
+
+                <div className="stat-card danger">
+                  <div className="stat-icon">⏳</div>
+                  <div className="stat-content">
+                    <h3>Chờ xác minh</h3>
+                    <p className="stat-number">{housekeeperDetails.unverified || 0}</p>
+                    <span className="stat-change">Cần xem xét</span>
+                  </div>
+                </div>
+
+                <div className="stat-card primary">
+                  <div className="stat-icon">⭐</div>
+                  <div className="stat-content">
+                    <h3>Đánh giá trung bình</h3>
+                    <p className="stat-number">{housekeeperDetails.avgRating || 0}/5</p>
+                    <span className="stat-change">Từ khách hàng</span>
+                  </div>
+                </div>
+
+                <div className="stat-card success">
+                  <div className="stat-icon">🏆</div>
+                  <div className="stat-content">
+                    <h3>Tổng công việc hoàn thành</h3>
+                    <p className="stat-number">{housekeeperDetails.totalCompletedJobs || 0}</p>
+                    <span className="stat-change">Tất cả người giúp việc</span>
+                  </div>
                 </div>
               </div>
             </div>

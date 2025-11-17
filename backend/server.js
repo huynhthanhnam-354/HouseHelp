@@ -1054,6 +1054,18 @@ io.on('connection', (socket) => {
     
     socket.userId = userId;
     socket.role = role;
+    
+    // Cập nhật trạng thái available cho housekeeper khi đăng nhập
+    if (role === 'housekeeper') {
+      db.query('UPDATE housekeepers SET available = 1, lastOnline = NOW() WHERE userId = ?', [userId], (err) => {
+        if (err) {
+          console.error('Error updating housekeeper availability:', err);
+        } else {
+          console.log(`🟢 Housekeeper ${userId} is now AVAILABLE`);
+        }
+      });
+    }
+    
     console.log(`✅ User ${userId} (${role}) joined. Active users: ${activeUsers.size}`);
     console.log(`Stored user with keys:`, [userId, userIdStr, userIdNum]);
   });
@@ -1064,11 +1076,22 @@ io.on('connection', (socket) => {
       const userIdStr = String(socket.userId);
       const userIdNum = parseInt(socket.userId);
       
+      // Cập nhật trạng thái available cho housekeeper khi đăng xuất
+      if (socket.role === 'housekeeper') {
+        db.query('UPDATE housekeepers SET available = 0, lastOnline = NOW() WHERE userId = ?', [socket.userId], (err) => {
+          if (err) {
+            console.error('Error updating housekeeper availability:', err);
+          } else {
+            console.log(`🔴 Housekeeper ${socket.userId} is now UNAVAILABLE`);
+          }
+        });
+      }
+      
       activeUsers.delete(socket.userId);
       activeUsers.delete(userIdStr);
       activeUsers.delete(userIdNum);
       
-      console.log(`User ${socket.userId} disconnected`);
+      console.log(`❌ User ${socket.userId} disconnected. Active users: ${activeUsers.size}`);
     }
   });
 });
@@ -1230,8 +1253,14 @@ app.get('/api/admin/dashboard/overview', (req, res) => {
     'SELECT COUNT(*) as todayBookings FROM bookings WHERE DATE(createdAt) = CURDATE()',
     // Revenue hôm nay (từ payments đã thành công)
     'SELECT COALESCE(SUM(p.amount), 0) as todayRevenue FROM payments p JOIN bookings b ON p.bookingId = b.id WHERE DATE(p.paidAt) = CURDATE() AND p.status = "success"',
-    // Housekeepers đang hoạt động
-    'SELECT COUNT(*) as activeHousekeepers FROM housekeepers WHERE available = 1'
+    // Housekeepers đang hoạt động (available = 1)
+    'SELECT COUNT(*) as activeHousekeepers FROM housekeepers WHERE available = 1',
+    // Housekeepers đã xác minh và phê duyệt
+    'SELECT COUNT(*) as verifiedHousekeepers FROM users WHERE role = "housekeeper" AND isVerified = 1 AND isApproved = 1',
+    // Housekeepers chưa xác minh
+    'SELECT COUNT(*) as unverifiedHousekeepers FROM users WHERE role = "housekeeper" AND (isVerified = 0 OR isApproved = 0)',
+    // Housekeepers sẵn sàng nhận việc (verified + approved + available)
+    'SELECT COUNT(*) as readyHousekeepers FROM users u JOIN housekeepers h ON u.id = h.userId WHERE u.role = "housekeeper" AND u.isVerified = 1 AND u.isApproved = 1 AND h.available = 1'
   ];
 
   Promise.all(queries.map(query => 
@@ -1249,11 +1278,121 @@ app.get('/api/admin/dashboard/overview', (req, res) => {
       totalBookings: results[3].totalBookings,
       todayBookings: results[4].todayBookings,
       todayRevenue: results[5].todayRevenue,
-      activeHousekeepers: results[6].activeHousekeepers
+      activeHousekeepers: results[6].activeHousekeepers,
+      verifiedHousekeepers: results[7].verifiedHousekeepers,
+      unverifiedHousekeepers: results[8].unverifiedHousekeepers,
+      readyHousekeepers: results[9].readyHousekeepers
     });
   }).catch(err => {
     console.error('Error fetching overview stats:', err);
     res.status(500).json({ error: err.message });
+  });
+});
+
+// API: Admin toggle trạng thái available của housekeeper
+app.put('/api/admin/housekeepers/:userId/availability', (req, res) => {
+  const { userId } = req.params;
+  const { available } = req.body;
+  
+  if (available === undefined) {
+    return res.status(400).json({ error: 'available status is required' });
+  }
+  
+  const sql = 'UPDATE housekeepers SET available = ?, lastOnline = NOW() WHERE userId = ?';
+  
+  db.query(sql, [available ? 1 : 0, userId], (err, result) => {
+    if (err) {
+      console.error('Error updating housekeeper availability:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Housekeeper not found' });
+    }
+    
+    console.log(`🔄 Admin set housekeeper ${userId} availability to ${available ? 'AVAILABLE' : 'UNAVAILABLE'}`);
+    res.json({ 
+      success: true, 
+      message: `Housekeeper availability updated to ${available ? 'available' : 'unavailable'}` 
+    });
+  });
+});
+
+// API: Debug - Xem tất cả housekeepers
+app.get('/api/debug/housekeepers', (req, res) => {
+  const sql = `
+    SELECT u.id, u.fullName, u.email, u.role, u.isVerified, u.isApproved, 
+           h.available, h.rating, h.completedJobs, h.userId as housekeeperId
+    FROM users u 
+    LEFT JOIN housekeepers h ON u.id = h.userId 
+    WHERE u.role = 'housekeeper'
+    ORDER BY u.id
+  `;
+  
+  db.query(sql, (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(results);
+  });
+});
+
+// API: Thống kê chi tiết người giúp việc
+app.get('/api/admin/dashboard/housekeeper-details', (req, res) => {
+  const sql = `
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN u.isVerified = 1 AND u.isApproved = 1 THEN 1 ELSE 0 END) as verified,
+      SUM(CASE WHEN u.isVerified = 0 OR u.isApproved = 0 THEN 1 ELSE 0 END) as unverified,
+      SUM(CASE WHEN h.available = 1 THEN 1 ELSE 0 END) as available,
+      SUM(CASE WHEN h.available = 0 THEN 1 ELSE 0 END) as unavailable,
+      SUM(CASE WHEN u.isVerified = 1 AND u.isApproved = 1 AND h.available = 1 THEN 1 ELSE 0 END) as ready,
+      AVG(h.rating) as avgRating,
+      SUM(h.completedJobs) as totalCompletedJobs
+    FROM users u
+    LEFT JOIN housekeepers h ON u.id = h.userId
+    WHERE u.role = 'housekeeper'
+  `;
+  
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Error fetching housekeeper details:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    const stats = results[0];
+    
+    // Debug logging
+    console.log('🔍 HOUSEKEEPER STATS DEBUG:');
+    console.log('Raw query result:', stats);
+    
+    // Thêm query debug để xem chi tiết
+    const debugSql = `
+      SELECT u.id, u.fullName, u.role, u.isVerified, u.isApproved, h.available
+      FROM users u 
+      LEFT JOIN housekeepers h ON u.id = h.userId 
+      WHERE u.role = 'housekeeper'
+    `;
+    
+    db.query(debugSql, (debugErr, debugResults) => {
+      if (!debugErr) {
+        console.log('📋 All housekeepers in database:');
+        debugResults.forEach((hk, index) => {
+          console.log(`${index + 1}. ${hk.fullName} - Verified: ${hk.isVerified}, Approved: ${hk.isApproved}, Available: ${hk.available}`);
+        });
+      }
+    });
+    
+    res.json({
+      total: stats.total || 0,
+      verified: stats.verified || 0,
+      unverified: stats.unverified || 0,
+      available: stats.available || 0,
+      unavailable: stats.unavailable || 0,
+      ready: stats.ready || 0,
+      avgRating: parseFloat(stats.avgRating || 0).toFixed(1),
+      totalCompletedJobs: stats.totalCompletedJobs || 0
+    });
   });
 });
 
