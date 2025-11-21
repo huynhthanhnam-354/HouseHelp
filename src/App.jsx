@@ -14,6 +14,7 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import { BookingProvider } from "./contexts/BookingContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import ToastContainer from "./components/ToastContainer";
+import ChatbotButton from "./components/Chatbot/ChatbotButton";
 import './App.css';
 
 export default function App() {
@@ -37,8 +38,9 @@ export default function App() {
               <Route path="/settings/language" element={<SettingLanguage />} />
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
-            <ToastContainer />
-          </NotificationProvider>
+                    <ToastContainer />
+                    <ChatbotButton />
+                  </NotificationProvider>
         </Router>
       </BookingProvider>
     </LanguageProvider>

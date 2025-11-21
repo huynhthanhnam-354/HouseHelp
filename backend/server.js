@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const http = require('http');
 const socketIo = require('socket.io');
+const ChatbotService = require('./services/chatbotService');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,6 +32,9 @@ db.connect(err => {
   if (err) throw err;
   console.log('MySQL Connected!');
 });
+
+// Initialize Chatbot Service
+const chatbotService = new ChatbotService();
 
 // API: Lấy tất cả housekeepers (filter dịch vụ theo bảng housekeeper_services, OR logic)
 app.get('/api/housekeepers', (req, res) => {
@@ -2358,6 +2362,387 @@ app.delete('/api/conversations/:bookingId', (req, res) => {
       });
     });
   });
+});
+
+// ========================
+// CHATBOT AI APIs
+// ========================
+
+// API: Chat với AI Assistant
+app.post('/api/chatbot/message', async (req, res) => {
+  try {
+    const { message, conversationHistory, userContext } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // Lấy thông tin user context từ database nếu có userId
+    let enrichedContext = userContext || {};
+    
+    if (userContext?.userId) {
+      const userSql = 'SELECT fullName, email, phone FROM users WHERE id = ?';
+      const userResult = await new Promise((resolve, reject) => {
+        db.query(userSql, [userContext.userId], (err, results) => {
+          if (err) reject(err);
+          else resolve(results[0] || {});
+        });
+      });
+      
+      // Lấy lịch sử booking của user
+      const bookingSql = `
+        SELECT s.name as serviceName, COUNT(*) as count 
+        FROM bookings b 
+        JOIN services s ON b.serviceId = s.id 
+        WHERE b.customerId = ? 
+        GROUP BY s.name
+      `;
+      const bookingResult = await new Promise((resolve, reject) => {
+        db.query(bookingSql, [userContext.userId], (err, results) => {
+          if (err) reject(err);
+          else resolve(results);
+        });
+      });
+
+      enrichedContext = {
+        ...enrichedContext,
+        name: userResult.fullName,
+        email: userResult.email,
+        phone: userResult.phone,
+        previousBookings: bookingResult.map(b => b.serviceName)
+      };
+    }
+
+    const result = await chatbotService.processMessage(message, conversationHistory, enrichedContext);
+    
+    // Force correct suggestions based on user role
+    let correctSuggestions = result.suggestions;
+    if (enrichedContext.role === 'housekeeper') {
+      correctSuggestions = [
+        'Quản lý đơn hàng',
+        'Tối ưu giá dịch vụ', 
+        'Cải thiện đánh giá',
+        'Hướng dẫn app Housekeeper',
+        'Giải quyết vấn đề với khách'
+      ];
+      console.log('🔧 FORCE FIX - Using housekeeper suggestions');
+    } else if (enrichedContext.role === 'admin') {
+      correctSuggestions = [
+        'Phân tích dữ liệu',
+        'Quản lý người dùng',
+        'Báo cáo hệ thống',
+        'Xử lý khiếu nại',
+        'Cấu hình hệ thống'
+      ];
+      console.log('🔧 FORCE FIX - Using admin suggestions');
+    }
+    
+    res.json({
+      success: true,
+      response: result.response,
+      intent: result.intent,
+      suggestions: correctSuggestions,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Chatbot API error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: 'Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau.'
+    });
+  }
+});
+
+// API: Tính toán chi phí dự kiến
+app.post('/api/chatbot/calculate-cost', (req, res) => {
+  try {
+    const { service, duration, location } = req.body;
+    
+    if (!service || !duration) {
+      return res.status(400).json({ error: 'Service and duration are required' });
+    }
+
+    const costEstimate = chatbotService.calculateEstimatedCost(service, duration, location);
+    
+    if (!costEstimate) {
+      return res.status(404).json({ error: 'Service not found' });
+    }
+
+    res.json({
+      success: true,
+      estimate: costEstimate
+    });
+
+  } catch (error) {
+    console.error('Cost calculation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API: Gợi ý gói combo
+app.post('/api/chatbot/combo-recommendations', (req, res) => {
+  try {
+    const { services, frequency } = req.body;
+    
+    if (!services || !Array.isArray(services)) {
+      return res.status(400).json({ error: 'Services array is required' });
+    }
+
+    const recommendations = chatbotService.getComboRecommendations(services, frequency);
+    
+    res.json({
+      success: true,
+      recommendations: recommendations
+    });
+
+  } catch (error) {
+    console.error('Combo recommendations error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API: Lưu conversation với AI
+app.post('/api/chatbot/save-conversation', (req, res) => {
+  try {
+    const { userId, conversationData, sessionId } = req.body;
+    
+    if (!userId || !conversationData) {
+      return res.status(400).json({ error: 'UserId and conversationData are required' });
+    }
+
+    // Tạo bảng chatbot_conversations nếu chưa có
+    const createTableSql = `
+      CREATE TABLE IF NOT EXISTS chatbot_conversations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        userId INT NOT NULL,
+        sessionId VARCHAR(100),
+        conversationData JSON,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `;
+
+    db.query(createTableSql, (createErr) => {
+      if (createErr) {
+        console.error('Error creating chatbot_conversations table:', createErr);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      // Lưu conversation
+      const insertSql = `
+        INSERT INTO chatbot_conversations (userId, sessionId, conversationData) 
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE 
+        conversationData = VALUES(conversationData),
+        updatedAt = CURRENT_TIMESTAMP
+      `;
+
+      db.query(insertSql, [userId, sessionId, JSON.stringify(conversationData)], (err, result) => {
+        if (err) {
+          console.error('Error saving conversation:', err);
+          return res.status(500).json({ error: 'Failed to save conversation' });
+        }
+
+        res.json({
+          success: true,
+          conversationId: result.insertId || result.insertId,
+          message: 'Conversation saved successfully'
+        });
+      });
+    });
+
+  } catch (error) {
+    console.error('Save conversation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API: Lấy lịch sử conversation
+app.get('/api/chatbot/conversations/:userId', (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit = 10 } = req.query;
+
+    const sql = `
+      SELECT id, sessionId, conversationData, createdAt, updatedAt
+      FROM chatbot_conversations 
+      WHERE userId = ? 
+      ORDER BY updatedAt DESC 
+      LIMIT ?
+    `;
+
+    db.query(sql, [userId, parseInt(limit)], (err, results) => {
+      if (err) {
+        console.error('Error fetching conversations:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      const conversations = results.map(row => ({
+        ...row,
+        conversationData: JSON.parse(row.conversationData)
+      }));
+
+      res.json({
+        success: true,
+        conversations: conversations
+      });
+    });
+
+  } catch (error) {
+    console.error('Fetch conversations error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API: Gửi khiếu nại
+app.post('/api/complaints/submit', (req, res) => {
+  try {
+    const complaintData = req.body;
+    
+    // Tạo bảng complaints nếu chưa có
+    const createTableSql = `
+      CREATE TABLE IF NOT EXISTS complaints (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        ticketId VARCHAR(50) UNIQUE NOT NULL,
+        userId INT,
+        userName VARCHAR(100),
+        userEmail VARCHAR(100),
+        type VARCHAR(50) NOT NULL,
+        severity ENUM('low', 'medium', 'high') DEFAULT 'medium',
+        bookingId VARCHAR(50),
+        description TEXT NOT NULL,
+        evidence JSON,
+        contactPreference ENUM('email', 'phone', 'both') DEFAULT 'email',
+        status ENUM('pending', 'investigating', 'resolved', 'closed') DEFAULT 'pending',
+        assignedTo INT,
+        resolution TEXT,
+        submittedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        resolvedAt DATETIME,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `;
+
+    db.query(createTableSql, (createErr) => {
+      if (createErr) {
+        console.error('Error creating complaints table:', createErr);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      // Lưu khiếu nại
+      const insertSql = `
+        INSERT INTO complaints (
+          ticketId, userId, userName, userEmail, type, severity, 
+          bookingId, description, evidence, contactPreference, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const values = [
+        complaintData.ticketId,
+        complaintData.userId,
+        complaintData.userName,
+        complaintData.userEmail,
+        complaintData.type,
+        complaintData.severity,
+        complaintData.bookingId || null,
+        complaintData.description,
+        JSON.stringify(complaintData.evidence || []),
+        complaintData.contactPreference,
+        'pending'
+      ];
+
+      db.query(insertSql, values, (err, result) => {
+        if (err) {
+          console.error('Error saving complaint:', err);
+          return res.status(500).json({ error: 'Failed to save complaint' });
+        }
+
+        // Gửi email thông báo (giả lập)
+        console.log(`📧 Complaint notification sent for ticket: ${complaintData.ticketId}`);
+
+        res.json({
+          success: true,
+          ticketId: complaintData.ticketId,
+          message: 'Complaint submitted successfully',
+          complaintId: result.insertId
+        });
+      });
+    });
+
+  } catch (error) {
+    console.error('Submit complaint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API: Lấy danh sách khiếu nại của user
+app.get('/api/complaints/user/:userId', (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const sql = `
+      SELECT id, ticketId, type, severity, bookingId, description, 
+             status, submittedAt, updatedAt, resolvedAt
+      FROM complaints 
+      WHERE userId = ? 
+      ORDER BY submittedAt DESC
+    `;
+
+    db.query(sql, [userId], (err, results) => {
+      if (err) {
+        console.error('Error fetching user complaints:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      res.json({
+        success: true,
+        complaints: results
+      });
+    });
+
+  } catch (error) {
+    console.error('Fetch user complaints error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API: Lấy chi tiết khiếu nại
+app.get('/api/complaints/:ticketId', (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    
+    const sql = `
+      SELECT * FROM complaints WHERE ticketId = ?
+    `;
+
+    db.query(sql, [ticketId], (err, results) => {
+      if (err) {
+        console.error('Error fetching complaint details:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({ error: 'Complaint not found' });
+      }
+
+      const complaint = results[0];
+      // Parse JSON fields
+      if (complaint.evidence) {
+        complaint.evidence = JSON.parse(complaint.evidence);
+      }
+
+      res.json({
+        success: true,
+        complaint: complaint
+      });
+    });
+
+  } catch (error) {
+    console.error('Fetch complaint details error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 server.listen(5000, () => console.log('Server running on port 5000 with WebSocket support'));

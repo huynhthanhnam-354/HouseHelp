@@ -1,0 +1,440 @@
+/* App Guide Styles */
+.app-guide {
+  padding: 20px;
+  max-width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.guide-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.guide-header h3 {
+  color: #667eea;
+  margin: 0 0 12px 0;
+  font-size: 18px;
+}
+
+.progress-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+
+.progress-bar {
+  width: 200px;
+  height: 8px;
+  background: #e1e5e9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #666;
+  font-weight: 600;
+}
+
+/* Navigation */
+.guide-navigation {
+  margin-bottom: 20px;
+}
+
+.section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.section-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.section-tab:hover {
+  border-color: #667eea;
+  background: #f8f9ff;
+}
+
+.section-tab.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: #667eea;
+}
+
+.tab-icon {
+  font-size: 14px;
+}
+
+.tab-title {
+  font-weight: 500;
+}
+
+/* Content */
+.guide-content {
+  flex: 1;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e1e5e9;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content-header {
+  background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%);
+  padding: 16px 20px;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.content-header h4 {
+  margin: 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.content-body {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+.content-text {
+  line-height: 1.6;
+}
+
+.content-heading {
+  color: #333;
+  margin: 16px 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.content-paragraph {
+  color: #666;
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.bullet-point {
+  color: #555;
+  margin: 4px 0 4px 16px;
+  font-size: 13px;
+  position: relative;
+}
+
+.bullet-point::before {
+  content: '•';
+  color: #667eea;
+  font-weight: bold;
+  position: absolute;
+  left: -12px;
+}
+
+/* Steps Checklist */
+.steps-checklist {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e1e5e9;
+  height: fit-content;
+}
+
+.steps-checklist h5 {
+  color: #333;
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.step-item:hover {
+  border-color: #667eea;
+  background: #f8f9ff;
+}
+
+.step-item.completed {
+  background: #e8f5e8;
+  border-color: #4CAF50;
+}
+
+.step-checkbox {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.step-text {
+  font-size: 13px;
+  color: #333;
+  flex: 1;
+}
+
+.step-item.completed .step-text {
+  color: #2e7d32;
+  text-decoration: line-through;
+}
+
+/* Actions */
+.content-actions {
+  padding: 16px 20px;
+  border-top: 1px solid #e1e5e9;
+  background: #f8f9fa;
+}
+
+.navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.nav-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.prev-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.prev-btn:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+.complete-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  flex: 1;
+}
+
+.complete-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.quick-action-btn {
+  background: white;
+  color: #667eea;
+  border: 1px solid #667eea;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+  background: #667eea;
+  color: white;
+}
+
+/* Footer */
+.guide-footer {
+  margin-top: 16px;
+  padding: 16px;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+}
+
+.help-info p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #856404;
+  line-height: 1.4;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .app-guide {
+    padding: 16px;
+  }
+  
+  .section-tabs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .section-tab {
+    justify-content: center;
+    padding: 12px;
+  }
+  
+  .content-body {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .steps-checklist {
+    order: -1;
+  }
+  
+  .navigation-buttons {
+    flex-direction: column;
+  }
+  
+  .quick-actions {
+    flex-direction: column;
+  }
+  
+  .progress-info {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .progress-bar {
+    width: 100%;
+    max-width: 200px;
+  }
+}
+
+/* Scrollbar */
+.content-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.content-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.content-body::-webkit-scrollbar-thumb {
+  background: #ddd;
+  border-radius: 2px;
+}
+
+.content-body::-webkit-scrollbar-thumb:hover {
+  background: #bbb;
+}
+
+/* Animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.guide-content {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.step-item {
+  animation: fadeInUp 0.2s ease-out;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .app-guide {
+    color: #e0e0e0;
+  }
+  
+  .section-tab {
+    background: #2a2a2a;
+    border-color: #4a4a4a;
+    color: #e0e0e0;
+  }
+  
+  .section-tab:hover {
+    background: #3a3a3a;
+  }
+  
+  .guide-content {
+    background: #2a2a2a;
+    border-color: #4a4a4a;
+  }
+  
+  .content-header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  }
+  
+  .steps-checklist {
+    background: #2a2a2a;
+    border-color: #4a4a4a;
+  }
+  
+  .step-item {
+    background: #3a3a3a;
+  }
+  
+  .step-item:hover {
+    background: #4a4a4a;
+  }
+  
+  .step-item.completed {
+    background: #1a2e1a;
+    border-color: #4CAF50;
+  }
+  
+  .content-actions {
+    background: #2a2a2a;
+    border-top-color: #4a4a4a;
+  }
+  
+  .quick-action-btn {
+    background: #3a3a3a;
+    border-color: #667eea;
+  }
+  
+  .guide-footer {
+    background: #2a2a1a;
+    border-color: #4a4a2a;
+  }
+}
+

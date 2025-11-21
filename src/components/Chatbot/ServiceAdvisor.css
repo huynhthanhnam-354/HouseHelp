@@ -1,0 +1,433 @@
+/* Service Advisor Styles */
+.service-advisor {
+  padding: 20px;
+  max-width: 100%;
+}
+
+.advisor-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.advisor-header h3 {
+  color: #667eea;
+  margin: 0 0 8px 0;
+  font-size: 18px;
+}
+
+.advisor-header p {
+  color: #666;
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Service Selection */
+.service-selection h4 {
+  color: #333;
+  margin: 0 0 16px 0;
+  font-size: 16px;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.service-card {
+  border: 2px solid #e1e5e9;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  background: white;
+}
+
+.service-card:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  transform: translateY(-2px);
+}
+
+.service-card.selected {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+}
+
+.service-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.service-info h5 {
+  color: #333;
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.service-description {
+  color: #666;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0 0 12px 0;
+}
+
+.service-price {
+  color: #667eea;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.service-duration {
+  color: #999;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.estimated-cost {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e1e5e9;
+}
+
+.cost-estimate {
+  background: #4CAF50;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.service-check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #667eea;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.2s ease;
+}
+
+.service-card.selected .service-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Preferences */
+.preferences-section {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.preferences-section h4 {
+  color: #333;
+  margin: 0 0 16px 0;
+  font-size: 16px;
+}
+
+.preferences-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.preference-item label {
+  display: block;
+  color: #555;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.preference-item select,
+.preference-item input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  transition: border-color 0.2s ease;
+}
+
+.preference-item select:focus,
+.preference-item input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.get-recommendations-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.get-recommendations-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.get-recommendations-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Recommendations */
+.recommendations-section {
+  margin-bottom: 24px;
+}
+
+.recommendations-section h4 {
+  color: #333;
+  margin: 0 0 16px 0;
+  font-size: 16px;
+}
+
+.recommendations-list {
+  display: grid;
+  gap: 16px;
+}
+
+.combo-card {
+  background: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.combo-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.combo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.combo-header h5 {
+  color: #333;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.combo-discount {
+  background: #ff4444;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.combo-services,
+.combo-frequency,
+.combo-price {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #555;
+}
+
+.combo-services strong,
+.combo-frequency strong,
+.combo-price strong {
+  color: #333;
+}
+
+.select-combo-btn {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 12px;
+}
+
+.select-combo-btn:hover {
+  background: #45a049;
+  transform: translateY(-1px);
+}
+
+/* Selected Services Summary */
+.selected-services-summary {
+  background: #f0f8ff;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #b3d9ff;
+}
+
+.selected-services-summary h4 {
+  color: #0066cc;
+  margin: 0 0 16px 0;
+  font-size: 16px;
+}
+
+.service-summary {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid #e1e5e9;
+}
+
+.service-summary:last-child {
+  margin-bottom: 0;
+}
+
+.summary-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.summary-icon {
+  font-size: 20px;
+}
+
+.summary-header strong {
+  color: #333;
+  font-size: 14px;
+}
+
+.summary-details {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #666;
+}
+
+.suitable-for strong {
+  color: #333;
+  font-size: 13px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.suitable-for ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: #666;
+}
+
+.suitable-for li {
+  margin-bottom: 2px;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .service-advisor {
+    padding: 16px;
+  }
+  
+  .services-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .preferences-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .summary-details {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .combo-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* Animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.service-card,
+.combo-card,
+.service-summary {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .service-advisor {
+    color: #e0e0e0;
+  }
+  
+  .service-card {
+    background: #2a2a2a;
+    border-color: #4a4a4a;
+  }
+  
+  .service-card.selected {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  }
+  
+  .preferences-section,
+  .selected-services-summary {
+    background: #2a2a2a;
+  }
+  
+  .combo-card,
+  .service-summary {
+    background: #2a2a2a;
+    border-color: #4a4a4a;
+  }
+  
+  .preference-item select,
+  .preference-item input {
+    background: #3a3a3a;
+    border-color: #4a4a4a;
+    color: #e0e0e0;
+  }
+}
+
