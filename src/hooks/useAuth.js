@@ -33,10 +33,12 @@ export const useAuth = () => {
   };
 
   const login = (userData) => {
+    console.log('🔐 useAuth login called with:', userData);
     localStorage.setItem("househelp_user", JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
     setRefreshTrigger(prev => prev + 1); // Trigger refresh
+    console.log('✅ User logged in successfully, role:', userData.role);
   };
 
   const logout = () => {

@@ -36,21 +36,35 @@ export default function LoginForm() {
     if (Object.keys(err).length > 0) return;
     try {
       const res = await loginApi(email, password);
+      console.log('🔍 Login API Response:', res);
+      
       if (res.error) {
         setSubmitError(res.error);
       } else {
-        login(res); // Use useAuth login method
+        // Check if we have user data
+        const userData = res.user || res;
+        console.log('👤 User data:', userData);
+        console.log('🎭 User role:', userData.role);
+        
+        login(userData); // Use useAuth login method
         
         // Redirect based on user role
-        if (res.role === 'admin') {
-          // Admin redirect thẳng vào admin dashboard
+        if (userData.role === 'admin') {
+          console.log('🔄 Redirecting to admin dashboard...');
           navigate("/admin/dashboard");
+        } else if (userData.role === 'housekeeper') {
+          console.log('🔄 Redirecting housekeeper to home page...');
+          navigate("/"); // Housekeeper vào trang chủ để tìm việc
+        } else if (userData.role === 'customer') {
+          console.log('🔄 Redirecting to customer dashboard...');
+          navigate("/customer/dashboard");
         } else {
-          // Customer và Housekeeper vào trang chủ trước
+          console.log('🔄 Redirecting to home...');
           navigate("/");
         }
       }
     } catch (e) {
+      console.error('Login error:', e);
       setSubmitError("Login failed. Please try again.");
     }
   };

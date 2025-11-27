@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import translations from '../locales/translations';
 import BookingCompletion from '../components/BookingCompletion';
+import VerificationStatus from '../components/VerificationStatus';
 import './HousekeeperDashboard.css';
 
 export default function HousekeeperDashboard() {
@@ -18,7 +19,8 @@ export default function HousekeeperDashboard() {
   const [confirmedBookings, setConfirmedBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [verificationStatus, setVerificationStatus] = useState({ isVerified: true, isApproved: true });
+  const [verificationStatus, setVerificationStatus] = useState({ isVerified: false, isApproved: false });
+  const [forceUpdate, setForceUpdate] = useState(0);
 
   // Kiểm tra trạng thái xác minh của housekeeper
   useEffect(() => {
@@ -26,15 +28,40 @@ export default function HousekeeperDashboard() {
       if (!user?.id) return;
       
       try {
+        console.log('🔍 Checking verification status for user:', user.id);
+        console.log('👤 Full user object:', user);
         const response = await fetch(`http://localhost:5000/api/admin/housekeepers/status`);
         if (response.ok) {
           const housekeepers = await response.json();
-          const currentHousekeeper = housekeepers.find(hk => hk.id === user.id);
+          console.log('📋 All housekeepers:', housekeepers);
+          console.log('🔍 Looking for user ID:', user.id, 'in housekeepers list');
+          
+          // Try both user.id and exact match
+          let currentHousekeeper = housekeepers.find(hk => hk.id === user.id);
+          if (!currentHousekeeper) {
+            console.log('❌ Not found by hk.id, trying by email...');
+            currentHousekeeper = housekeepers.find(hk => hk.email === user.email);
+          }
+          if (!currentHousekeeper) {
+            console.log('❌ Not found by email, trying by fullName...');
+            currentHousekeeper = housekeepers.find(hk => hk.fullName === user.fullName);
+          }
+          
+          console.log('👤 Current housekeeper found:', currentHousekeeper);
+          
           if (currentHousekeeper) {
-            setVerificationStatus({
-              isVerified: currentHousekeeper.isVerified,
-              isApproved: currentHousekeeper.isApproved
-            });
+            const newStatus = {
+              isVerified: Boolean(currentHousekeeper.isVerified),
+              isApproved: Boolean(currentHousekeeper.isApproved)
+            };
+            console.log('✅ Setting verification status:', newStatus);
+            setVerificationStatus(newStatus);
+            // Force component re-render
+            setForceUpdate(prev => prev + 1);
+          } else {
+            console.log('❌ No housekeeper found for current user');
+            // Set default unverified status if not found
+            setVerificationStatus({ isVerified: false, isApproved: false });
           }
         }
       } catch (error) {
@@ -44,6 +71,36 @@ export default function HousekeeperDashboard() {
 
     checkVerificationStatus();
   }, [user?.id, refreshTrigger]);
+
+  // Listen for WebSocket updates from admin
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.io) {
+      const socket = window.io('http://localhost:5000');
+      
+      socket.on('housekeeper_status_updated', (data) => {
+        console.log('🔔 Received status update:', data);
+        if (data.userId === user?.id) {
+          console.log('🎯 Status update for current user, refreshing...');
+          setVerificationStatus({
+            isVerified: Boolean(data.isVerified),
+            isApproved: Boolean(data.isApproved)
+          });
+          // Also trigger a full refresh
+          setRefreshTrigger(prev => prev + 1);
+        }
+      });
+
+      return () => {
+        socket.disconnect();
+      };
+    }
+  }, [user?.id]);
+
+  // Force re-render when verification status changes
+  useEffect(() => {
+    console.log('🔄 Verification status changed:', verificationStatus);
+    setForceUpdate(prev => prev + 1);
+  }, [verificationStatus.isVerified, verificationStatus.isApproved]);
 
   // Fetch bookings từ database thay vì dựa vào notifications
   useEffect(() => {
@@ -218,11 +275,38 @@ export default function HousekeeperDashboard() {
   // }
 
   return (
-    <div className="dashboard-container">
+    <div className="dashboard-container" key={`dashboard-${forceUpdate}`}>
       <div className="dashboard-header">
         <h1>Dashboard Người Giúp Việc</h1>
         <p>Xin chào, <strong>{user?.fullName}</strong>!</p>
+        <button 
+          className="refresh-btn"
+          onClick={() => {
+            console.log('🔄 Manual refresh triggered');
+            console.log('Current verification status before refresh:', verificationStatus);
+            setRefreshTrigger(prev => prev + 1);
+            // Force a state update to trigger re-render
+            setVerificationStatus(prev => ({...prev}));
+            setForceUpdate(prev => prev + 1);
+          }}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#4f46e5',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          🔄 Làm mới
+        </button>
       </div>
+
+      {/* Verification Status Component - Use dashboard logic instead */}
+      {/* <VerificationStatus /> */}
+
+
 
       {/* Thông báo trạng thái xác minh */}
       {(!verificationStatus.isVerified || !verificationStatus.isApproved) && (

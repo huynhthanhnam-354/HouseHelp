@@ -38,9 +38,9 @@ export default function App() {
               <Route path="/settings/language" element={<SettingLanguage />} />
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
-                    <ToastContainer />
-                    <ChatbotButton />
-                  </NotificationProvider>
+            <ToastContainer />
+            <ChatbotButton />
+          </NotificationProvider>
         </Router>
       </BookingProvider>
     </LanguageProvider>

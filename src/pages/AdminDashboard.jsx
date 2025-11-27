@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AdminVerificationPanel from '../components/AdminVerificationPanel';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -133,6 +134,21 @@ const AdminDashboard = () => {
         console.error('Error deleting review:', error);
       }
     }
+  };
+
+  // Helper functions for housekeeper status
+  const getHousekeeperStatusClass = (hk) => {
+    if (!hk.isVerified) return 'unverified';
+    if (!hk.isApproved) return 'pending';
+    if (!hk.available) return 'offline';
+    return 'active';
+  };
+
+  const getHousekeeperStatusText = (hk) => {
+    if (!hk.isVerified) return '🔴 Chưa xác minh';
+    if (!hk.isApproved) return '🟡 Chờ duyệt';
+    if (!hk.available) return '⚫ Không sẵn sàng';
+    return '🟢 Hoạt động';
   };
 
   const formatCurrency = (amount) => {
@@ -340,6 +356,13 @@ const AdminDashboard = () => {
             <span className="nav-icon">⭐</span>
             Đánh giá
           </button>
+          <button 
+            className={`nav-item ${activeSection === 'verification' ? 'active' : ''}`}
+            onClick={() => setActiveSection('verification')}
+          >
+            <span className="nav-icon">🔐</span>
+            Xác thực tài khoản
+          </button>
         </nav>
       </div>
 
@@ -354,6 +377,7 @@ const AdminDashboard = () => {
               {activeSection === 'bookings' && '📅 Quản lý Đặt lịch'}
               {activeSection === 'analytics' && '📈 Phân tích & Báo cáo'}
               {activeSection === 'reviews' && '⭐ Quản lý Đánh giá'}
+              {activeSection === 'verification' && '🔐 Xác thực tài khoản'}
             </h1>
             <p>Chào mừng trở lại! Đây là tổng quan hệ thống của bạn.</p>
           </div>
@@ -552,8 +576,8 @@ const AdminDashboard = () => {
                       </td>
                       <td>{hk.email}</td>
                       <td>
-                        <span className={`status-badge ${hk.available ? 'online' : 'offline'}`}>
-                          {hk.available ? '🟢 Sẵn sàng' : '🔴 Không sẵn sàng'}
+                        <span className={`status-badge ${getHousekeeperStatusClass(hk)}`}>
+                          {getHousekeeperStatusText(hk)}
                         </span>
                       </td>
                       <td>
@@ -903,6 +927,13 @@ const AdminDashboard = () => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Verification Management Section */}
+        {activeSection === 'verification' && (
+          <div className="verification-content">
+            <AdminVerificationPanel />
           </div>
         )}
       </div>

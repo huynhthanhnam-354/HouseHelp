@@ -26,7 +26,7 @@ CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   fullName VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   email VARCHAR(100) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
+  password VARCHAR(255),
   phone VARCHAR(20),
   role ENUM('customer','housekeeper','admin') DEFAULT 'customer',
   idCardFront LONGTEXT,
@@ -45,6 +45,10 @@ CREATE TABLE users (
   isApproved BOOLEAN DEFAULT FALSE,
   verifiedAt DATETIME,
   lastActiveAt DATETIME,
+  -- Google OAuth fields
+  googleId VARCHAR(255) UNIQUE,
+  authProvider ENUM('local','google') DEFAULT 'local',
+  profilePicture VARCHAR(500),
   createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
   updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -241,6 +245,23 @@ CREATE TABLE system_logs (
 );
 
 -- ========================
+-- file_uploads (mới)
+-- ========================
+CREATE TABLE file_uploads (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  userId INT NOT NULL,
+  fileName VARCHAR(255) NOT NULL,
+  originalName VARCHAR(255) NOT NULL,
+  filePath VARCHAR(500) NOT NULL,
+  fileType ENUM('avatar','id_card_front','id_card_back','profile_image','document') NOT NULL,
+  mimeType VARCHAR(100),
+  fileSize INT,
+  uploadedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_userId_fileType (userId, fileType)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- ========================
 -- Sample Data (tương thích)
 -- ========================
 INSERT INTO services (name, description, icon) VALUES
@@ -252,11 +273,11 @@ INSERT INTO services (name, description, icon) VALUES
 ('Vệ sinh công nghiệp', 'Vệ sinh văn phòng, nhà xưởng quy mô lớn', 'industrial-cleaning');
 
 INSERT INTO users (fullName, email, password, phone, role, avatar, dateOfBirth, gender, address, city, district, bio, languages, emergencyContact, emergencyContactName, isVerified, isApproved) VALUES
-('Nguyễn Thị Lan', 'lan.nguyen@email.com', '$2b$10$example_hash_1', '0901234567', 'housekeeper', '/avatars/lan-nguyen.jpg', '1990-05-15', 'female', '123 Đường ABC, Phường 1', 'TP.HCM', 'Quận 1', 'Tôi có 5 năm kinh nghiệm làm việc nhà và luôn tận tâm với công việc.', 'Tiếng Việt, Tiếng Anh', '0987654321', 'Nguyễn Văn Nam', TRUE, TRUE),
-('Trần Văn Minh', 'minh.tran@email.com', '$2b$10$example_hash_2', '0912345678', 'housekeeper', '/avatars/minh-tran.jpg', '1985-08-20', 'male', '456 Đường XYZ, Phường 2', 'TP.HCM', 'Quận 3', 'Chuyên về vệ sinh công nghiệp và làm sạch nhà cửa.', 'Tiếng Việt', '0976543210', 'Trần Thị Mai', TRUE, TRUE),
-('Lê Thị Hoa', 'hoa.le@email.com', '$2b$10$example_hash_3', '0923456789', 'customer', '/avatars/hoa-le.jpg', '1992-12-10', 'female', '789 Đường DEF, Phường 3', 'TP.HCM', 'Quận 7', 'Tôi là khách hàng thường xuyên sử dụng dịch vụ giúp việc.', 'Tiếng Việt', '0965432109', 'Lê Văn Đức', FALSE, FALSE),
-('Phạm Văn Tuấn', 'tuan.pham@email.com', '$2b$10$example_hash_4', '0934567890', 'customer', '/avatars/tuan-pham.jpg', '1988-03-25', 'male', '321 Đường GHI, Phường 4', 'Hà Nội', 'Quận Ba Đình', 'Chủ nhà thường xuyên cần dịch vụ vệ sinh.', 'Tiếng Việt, Tiếng Anh', '0954321098', 'Phạm Thị Lan', FALSE, FALSE),
-('Admin System', 'admin@househelp.com', '$2b$10$example_admin', '0999999999', 'admin', '/avatars/admin.jpg', '1990-01-01', 'male', 'Trụ sở chính', 'Hà Nội', 'Cầu Giấy', 'Quản trị hệ thống HouseHelp', 'Tiếng Việt', NULL, NULL, TRUE, TRUE);
+('Nguyễn Thị Lan', 'lan.nguyen@email.com', SHA2('123456', 256), '0901234567', 'housekeeper', '/avatars/lan-nguyen.jpg', '1990-05-15', 'female', '123 Đường ABC, Phường 1', 'TP.HCM', 'Quận 1', 'Tôi có 5 năm kinh nghiệm làm việc nhà và luôn tận tâm với công việc.', 'Tiếng Việt, Tiếng Anh', '0987654321', 'Nguyễn Văn Nam', TRUE, TRUE),
+('Trần Văn Minh', 'minh.tran@email.com', SHA2('123456', 256), '0912345678', 'housekeeper', '/avatars/minh-tran.jpg', '1985-08-20', 'male', '456 Đường XYZ, Phường 2', 'TP.HCM', 'Quận 3', 'Chuyên về vệ sinh công nghiệp và làm sạch nhà cửa.', 'Tiếng Việt', '0976543210', 'Trần Thị Mai', TRUE, TRUE),
+('Lê Thị Hoa', 'hoa.le@email.com', SHA2('123456', 256), '0923456789', 'customer', '/avatars/hoa-le.jpg', '1992-12-10', 'female', '789 Đường DEF, Phường 3', 'TP.HCM', 'Quận 7', 'Tôi là khách hàng thường xuyên sử dụng dịch vụ giúp việc.', 'Tiếng Việt', '0965432109', 'Lê Văn Đức', FALSE, FALSE),
+('Phạm Văn Tuấn', 'tuan.pham@email.com', SHA2('123456', 256), '0934567890', 'customer', '/avatars/tuan-pham.jpg', '1988-03-25', 'male', '321 Đường GHI, Phường 4', 'Hà Nội', 'Quận Ba Đình', 'Chủ nhà thường xuyên cần dịch vụ vệ sinh.', 'Tiếng Việt, Tiếng Anh', '0954321098', 'Phạm Thị Lan', FALSE, FALSE),
+('Admin System', 'admin@househelp.com', SHA2('admin123', 256), '0999999999', 'admin', '/avatars/admin.jpg', '1990-01-01', 'male', 'Trụ sở chính', 'Hà Nội', 'Cầu Giấy', 'Quản trị hệ thống HouseHelp', 'Tiếng Việt', NULL, NULL, TRUE, TRUE);
 
 INSERT INTO housekeepers (userId, rating, totalReviews, services, price, priceType, description, experience, skills, certifications, workingDays, workingHours, serviceRadius, profileImages, hasInsurance, completedJobs, responseTime, isTopRated) VALUES
 (1, 4.8, 127, 'Vệ sinh nhà cửa, Giặt ủi, Nấu ăn', 80000.00, 'hourly', 'Tôi có 5 năm kinh nghiệm trong lĩnh vực giúp việc nhà.', 5, 
@@ -429,6 +450,181 @@ SELECT 'PAYMENT STATUS UPDATE' as info,
 FROM bookings 
 WHERE status = 'completed' 
 ORDER BY id DESC;
+
+-- ========================
+-- PACKAGE.JSON DEPENDENCIES UPDATE
+-- ========================
+-- Add these to backend/package.json dependencies:
+-- "multer": "^1.4.5-lts.1"
+
+-- ========================
+-- GOOGLE OAUTH SETUP INSTRUCTIONS
+-- ========================
+-- 1. Go to Google Cloud Console: https://console.cloud.google.com/
+-- 2. Create a new project or select existing project
+-- 3. Enable Google+ API and Google Identity Services
+-- 4. Create OAuth 2.0 credentials
+-- 5. Add authorized origins: http://localhost:3000, http://localhost:5174
+-- 6. Replace client_id in GoogleAuthButton.jsx with your actual client ID
+
+-- ========================
+-- VERIFICATION DOCUMENTS TABLE
+-- ========================
+CREATE TABLE verification_documents (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  userId INT NOT NULL,
+  documentType ENUM('id_card_front','id_card_back','certificate','license','insurance','other') NOT NULL,
+  filePath VARCHAR(500) NOT NULL,
+  originalName VARCHAR(255) NOT NULL,
+  status ENUM('pending','approved','rejected') DEFAULT 'pending',
+  adminNotes TEXT,
+  reviewedBy INT NULL,
+  reviewedAt DATETIME NULL,
+  uploadedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (reviewedBy) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_user_status (userId, status),
+  INDEX idx_status_type (status, documentType)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- ========================
+-- VERIFICATION REQUESTS TABLE  
+-- ========================
+CREATE TABLE verification_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  userId INT NOT NULL,
+  requestType ENUM('initial_verification','document_update','resubmission') DEFAULT 'initial_verification',
+  status ENUM('pending','under_review','approved','rejected','requires_more_info') DEFAULT 'pending',
+  submittedDocuments JSON,
+  adminNotes TEXT,
+  userNotes TEXT,
+  priority ENUM('low','normal','high','urgent') DEFAULT 'normal',
+  assignedTo INT NULL,
+  submittedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  reviewedAt DATETIME NULL,
+  completedAt DATETIME NULL,
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (assignedTo) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_status_priority (status, priority),
+  INDEX idx_assigned_status (assignedTo, status)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- ========================
+-- ADDITIONAL INDEXES FOR PERFORMANCE
+-- ========================
+CREATE INDEX idx_users_email_auth ON users(email, authProvider);
+CREATE INDEX idx_users_google_id ON users(googleId);
+CREATE INDEX idx_users_verification_status ON users(isVerified, isApproved, role);
+CREATE INDEX idx_file_uploads_user_type ON file_uploads(userId, fileType);
+
+-- ========================
+-- SAMPLE GOOGLE OAUTH USER
+-- ========================
+INSERT INTO users (fullName, email, googleId, authProvider, profilePicture, role, isVerified, isApproved, createdAt) VALUES
+('Google Test User', 'googleuser@gmail.com', 'google_123456789', 'google', 'https://lh3.googleusercontent.com/a/default-user', 'customer', 1, 1, NOW());
+
+-- ========================
+-- SAMPLE VERIFICATION DATA
+-- ========================
+
+-- Thêm housekeeper chưa được xác thực
+INSERT INTO users (fullName, email, password, phone, role, address, city, district, isVerified, isApproved, createdAt) VALUES
+('Nguyễn Văn Tân', 'tan.nguyen@email.com', SHA2('123456', 256), '0945678901', 'housekeeper', '789 Đường PQR, Phường 5', 'TP.HCM', 'Quận 10', 0, 0, NOW()),
+('Lê Thị Mai', 'mai.le@email.com', SHA2('123456', 256), '0956789012', 'housekeeper', '321 Đường STU, Phường 6', 'Hà Nội', 'Quận Đống Đa', 0, 0, NOW());
+
+-- Tạo housekeeper records cho users mới
+-- Sử dụng LAST_INSERT_ID() để lấy ID của user vừa tạo
+SET @tanUserId = (SELECT id FROM users WHERE email = 'tan.nguyen@email.com');
+SET @maiUserId = (SELECT id FROM users WHERE email = 'mai.le@email.com');
+
+INSERT INTO housekeepers (userId, rating, services, price, available, description, experience) VALUES
+(@tanUserId, 0, 'Dọn dẹp nhà cửa, Giặt ủi', 60000, 0, 'Người giúp việc mới, cần xác thực', 2),
+(@maiUserId, 0, 'Nấu ăn, Chăm sóc trẻ em', 70000, 0, 'Có kinh nghiệm chăm sóc trẻ em', 3);
+
+-- Tạo verification requests
+INSERT INTO verification_requests (userId, requestType, userNotes, priority, submittedAt) VALUES
+(@tanUserId, 'initial_verification', 'Tôi có 2 năm kinh nghiệm làm việc nhà. Mong admin xem xét sớm.', 'high', NOW()),
+(@maiUserId, 'initial_verification', 'Tôi đã có chứng chỉ chăm sóc trẻ em và 3 năm kinh nghiệm.', 'normal', DATE_SUB(NOW(), INTERVAL 1 DAY));
+
+-- Tạo sample verification documents
+INSERT INTO verification_documents (userId, documentType, filePath, originalName, status) VALUES
+(@tanUserId, 'id_card_front', '/uploads/id_cards/tan_id_front.jpg', 'CMND_mat_truoc.jpg', 'pending'),
+(@tanUserId, 'id_card_back', '/uploads/id_cards/tan_id_back.jpg', 'CMND_mat_sau.jpg', 'pending'),
+(@maiUserId, 'id_card_front', '/uploads/id_cards/mai_id_front.jpg', 'CCCD_mat_truoc.jpg', 'pending'),
+(@maiUserId, 'id_card_back', '/uploads/id_cards/mai_id_back.jpg', 'CCCD_mat_sau.jpg', 'pending'),
+(@maiUserId, 'certificate', '/uploads/certificates/mai_cert.pdf', 'Chung_chi_cham_soc_tre_em.pdf', 'pending');
+
+-- Tạo notifications cho admin về verification requests
+SET @adminId = (SELECT id FROM users WHERE role = 'admin' LIMIT 1);
+
+INSERT INTO notifications (userId, type, title, message, data, createdAt) VALUES
+(@adminId, 'verification_request', 'Yêu cầu xác thực mới', 
+ 'Nguyễn Văn Tân đã gửi yêu cầu xác thực tài khoản housekeeper', 
+ CONCAT('{"userId": ', @tanUserId, ', "userName": "Nguyễn Văn Tân", "requestType": "initial_verification"}'), NOW()),
+(@adminId, 'verification_request', 'Yêu cầu xác thực mới', 
+ 'Lê Thị Mai đã gửi yêu cầu xác thực tài khoản housekeeper', 
+ CONCAT('{"userId": ', @maiUserId, ', "userName": "Lê Thị Mai", "requestType": "initial_verification"}'), NOW());
+
+-- ========================
+-- UPDATE EXISTING USERS PASSWORD HASH
+-- ========================
+-- Convert existing plain text passwords to SHA256 hash for security
+UPDATE users SET password = SHA2(password, 256) WHERE authProvider = 'local' AND password NOT LIKE '$%';
+
+-- ========================
+-- FIX LOGIN PASSWORDS FOR ALL USERS
+-- ========================
+-- Cập nhật password để đăng nhập được (sử dụng SHA256)
+
+-- Admin password: admin123
+UPDATE users SET password = SHA2('admin123', 256) WHERE email = 'admin@househelp.com';
+
+-- Housekeeper passwords: 123456
+UPDATE users SET password = SHA2('123456', 256) WHERE email = 'lan.nguyen@email.com';
+UPDATE users SET password = SHA2('123456', 256) WHERE email = 'minh.tran@email.com';
+UPDATE users SET password = SHA2('123456', 256) WHERE email = 'tan.nguyen@email.com';
+UPDATE users SET password = SHA2('123456', 256) WHERE email = 'mai.le@email.com';
+
+-- Customer passwords: 123456  
+UPDATE users SET password = SHA2('123456', 256) WHERE email = 'hoa.le@email.com';
+UPDATE users SET password = SHA2('123456', 256) WHERE email = 'tuan.pham@email.com';
+
+-- Google OAuth user (không cần password)
+UPDATE users SET password = NULL WHERE email = 'googleuser@gmail.com' AND authProvider = 'google';
+
+-- ========================
+-- VERIFICATION DATA CHECK
+-- ========================
+
+-- Kiểm tra dữ liệu verification đã tạo
+SELECT 'VERIFICATION SYSTEM STATUS' as info;
+SELECT 'New Housekeepers Created' as status, COUNT(*) as count FROM users WHERE role = 'housekeeper' AND isVerified = 0;
+SELECT 'Verification Requests' as status, COUNT(*) as count FROM verification_requests;
+SELECT 'Verification Documents' as status, COUNT(*) as count FROM verification_documents;
+SELECT 'Admin Notifications' as status, COUNT(*) as count FROM notifications WHERE type = 'verification_request';
+
+-- Hiển thị thông tin housekeeper mới
+SELECT 'NEW HOUSEKEEPERS INFO' as info;
+SELECT fullName, email, isVerified, isApproved, createdAt FROM users WHERE email IN ('tan.nguyen@email.com', 'mai.le@email.com');
+
+-- ========================
+-- LOGIN CREDENTIALS INFO
+-- ========================
+SELECT '=== THÔNG TIN ĐĂNG NHẬP ===' as info;
+
+SELECT 'ADMIN ACCOUNT' as account_type, 'admin@househelp.com' as email, 'admin123' as password, 'Quản trị hệ thống' as description;
+
+SELECT 'HOUSEKEEPER ACCOUNTS' as account_type, '' as email, '' as password, '' as description;
+SELECT '' as account_type, 'lan.nguyen@email.com' as email, '123456' as password, 'Đã xác thực - có thể nhận việc' as description;
+SELECT '' as account_type, 'minh.tran@email.com' as email, '123456' as password, 'Đã xác thực - có thể nhận việc' as description;
+SELECT '' as account_type, 'tan.nguyen@email.com' as email, '123456' as password, 'CHƯA xác thực - cần admin duyệt' as description;
+SELECT '' as account_type, 'mai.le@email.com' as email, '123456' as password, 'CHƯA xác thực - cần admin duyệt' as description;
+
+SELECT 'CUSTOMER ACCOUNTS' as account_type, '' as email, '' as password, '' as description;
+SELECT '' as account_type, 'hoa.le@email.com' as email, '123456' as password, 'Khách hàng thường' as description;
+SELECT '' as account_type, 'tuan.pham@email.com' as email, '123456' as password, 'Khách hàng thường' as description;
+
+SELECT 'GOOGLE OAUTH TEST' as account_type, 'googleuser@gmail.com' as email, 'Không cần password' as password, 'Đăng nhập bằng Google' as description;
 
 -- Commit transaction
 COMMIT;
