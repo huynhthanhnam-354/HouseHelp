@@ -180,6 +180,58 @@ CREATE TABLE notifications (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ========================
+-- reports (báo cáo vi phạm)
+-- ========================
+CREATE TABLE reports (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  bookingId INT NOT NULL,
+  customerId INT NOT NULL,
+  housekeeperId INT NOT NULL,
+  reportType ENUM('late_arrival','no_show','inappropriate_behavior','poor_service','damage','other') NOT NULL,
+  title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  evidence TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci, -- URLs của ảnh/video bằng chứng
+  status ENUM('pending','investigating','resolved','dismissed') DEFAULT 'pending',
+  adminResponse TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  severity ENUM('low','medium','high','critical') DEFAULT 'medium',
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  resolvedAt DATETIME NULL,
+  FOREIGN KEY (bookingId) REFERENCES bookings(id) ON DELETE CASCADE,
+  FOREIGN KEY (customerId) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (housekeeperId) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_status (status),
+  INDEX idx_reportType (reportType),
+  INDEX idx_severity (severity),
+  INDEX idx_createdAt (createdAt)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- ========================
+-- warnings (cảnh cáo housekeeper)
+-- ========================
+CREATE TABLE warnings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  housekeeperId INT NOT NULL,
+  reportId INT NOT NULL,
+  adminId INT NOT NULL,
+  warningType ENUM('verbal','written','final','suspension') DEFAULT 'written',
+  title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  message TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  severity ENUM('low','medium','high','critical') DEFAULT 'medium',
+  isRead BOOLEAN DEFAULT FALSE,
+  expiresAt DATETIME NULL, -- Cho suspension warnings
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  readAt DATETIME NULL,
+  FOREIGN KEY (housekeeperId) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (reportId) REFERENCES reports(id) ON DELETE CASCADE,
+  FOREIGN KEY (adminId) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_housekeeperId (housekeeperId),
+  INDEX idx_createdAt (createdAt),
+  INDEX idx_warningType (warningType),
+  INDEX idx_isRead (isRead)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- ========================
 -- payments (mới)
 -- ========================
 CREATE TABLE payments (
@@ -627,4 +679,4 @@ SELECT '' as account_type, 'tuan.pham@email.com' as email, '123456' as password,
 SELECT 'GOOGLE OAUTH TEST' as account_type, 'googleuser@gmail.com' as email, 'Không cần password' as password, 'Đăng nhập bằng Google' as description;
 
 -- Commit transaction
-COMMIT;
+COMMIT;househelphousehelp

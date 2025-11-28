@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import translations from '../locales/translations';
 import BookingCompletion from '../components/BookingCompletion';
+import ReportForm from '../components/ReportForm';
 import './CustomerDashboard.css';
 
 export default function CustomerDashboard() {
@@ -16,8 +17,11 @@ export default function CustomerDashboard() {
   
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'notifications'
+  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'notifications' | 'reports'
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [selectedBookingForReport, setSelectedBookingForReport] = useState(null);
+  const [reports, setReports] = useState([]);
 
   // Fetch customer's bookings
   useEffect(() => {
@@ -43,6 +47,27 @@ export default function CustomerDashboard() {
 
     fetchBookings();
   }, [user?.id, refreshTrigger]);
+
+  // Fetch customer's reports
+  useEffect(() => {
+    const fetchReports = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const response = await fetch(`http://localhost:5000/api/reports/customer/${user.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setReports(data.reports || []);
+        }
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+      }
+    };
+
+    if (activeTab === 'reports') {
+      fetchReports();
+    }
+  }, [user?.id, activeTab, refreshTrigger]);
 
   // Auto refresh mỗi 10 giây để cập nhật status
   useEffect(() => {
@@ -121,8 +146,58 @@ export default function CustomerDashboard() {
   };
 
   const customerNotifications = notifications.filter(notif => 
-    notif.type === 'booking_confirmed' || notif.type === 'booking_rejected'
+    notif.type === 'booking_confirmed' || notif.type === 'booking_rejected' || notif.type === 'report_update'
   );
+
+  // Handle report functions
+  const handleReportBooking = (booking) => {
+    // Chỉ cho phép báo cáo booking đã hoàn thành hoặc đã hủy
+    if (!['completed', 'cancelled', 'confirmed'].includes(booking.status)) {
+      alert('Chỉ có thể báo cáo vi phạm cho các đặt lịch đã hoàn thành hoặc đã xác nhận');
+      return;
+    }
+    
+    setSelectedBookingForReport(booking);
+    setShowReportForm(true);
+  };
+
+  const handleReportSubmit = (result) => {
+    console.log('Report submitted:', result);
+    // Refresh reports list
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const getReportTypeLabel = (type) => {
+    const types = {
+      late_arrival: 'Đến muộn',
+      no_show: 'Không đến',
+      inappropriate_behavior: 'Hành vi không phù hợp',
+      poor_service: 'Dịch vụ kém',
+      damage: 'Làm hỏng đồ đạc',
+      other: 'Khác'
+    };
+    return types[type] || type;
+  };
+
+  const getReportStatusLabel = (status) => {
+    const statuses = {
+      pending: 'Chờ xử lý',
+      investigating: 'Đang điều tra',
+      resolved: 'Đã giải quyết',
+      dismissed: 'Đã từ chối'
+    };
+    return statuses[status] || status;
+  };
+
+  const getReportStatusColor = (status) => {
+    const colors = {
+      pending: '#ffc107',
+      investigating: '#007bff',
+      resolved: '#28a745',
+      dismissed: '#6c757d'
+    };
+    return colors[status] || '#6c757d';
+  };
 
   // Redirect if not customer
   if (user?.role !== 'customer') {
@@ -162,6 +237,12 @@ export default function CustomerDashboard() {
           onClick={() => setActiveTab('notifications')}
         >
           Thông báo ({customerNotifications.filter(n => !n.read).length})
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reports')}
+        >
+          Báo cáo vi phạm ({reports.length})
         </button>
       </div>
 
@@ -265,11 +346,25 @@ export default function CustomerDashboard() {
                       </div>
                     )}
 
-                    {/* Booking Completion Component */}
-                    <BookingCompletion 
-                      booking={booking} 
-                      onStatusUpdate={() => setRefreshTrigger(prev => prev + 1)}
-                    />
+                    {/* Booking Actions */}
+                    <div className="booking-actions">
+                      {/* Booking Completion Component */}
+                      <BookingCompletion 
+                        booking={booking} 
+                        onStatusUpdate={() => setRefreshTrigger(prev => prev + 1)}
+                      />
+                      
+                      {/* Report Button - chỉ hiển thị cho booking đã hoàn thành hoặc xác nhận */}
+                      {(['completed', 'cancelled', 'confirmed'].includes(booking.status)) && (
+                        <button 
+                          className="report-btn"
+                          onClick={() => handleReportBooking(booking)}
+                          title="Báo cáo vi phạm"
+                        >
+                          ⚠️ Báo cáo vi phạm
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -318,6 +413,87 @@ export default function CustomerDashboard() {
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === 'reports' && (
+        <div className="reports-section">
+          <div className="section-header">
+            <h2>Báo cáo vi phạm</h2>
+            <p className="section-description">
+              Quản lý các báo cáo vi phạm của bạn đối với người giúp việc
+            </p>
+          </div>
+          
+          {reports.length === 0 ? (
+            <div className="no-reports">
+              <div className="no-reports-icon">📋</div>
+              <h3>Chưa có báo cáo nào</h3>
+              <p>Bạn chưa gửi báo cáo vi phạm nào. Nếu gặp vấn đề với người giúp việc, hãy báo cáo để chúng tôi hỗ trợ.</p>
+            </div>
+          ) : (
+            <div className="reports-list">
+              {reports.map((report) => (
+                <div key={report.id} className="report-card">
+                  <div className="report-header">
+                    <div className="report-type">
+                      <span className="type-label">{getReportTypeLabel(report.reportType)}</span>
+                      <span 
+                        className="status-badge"
+                        style={{ backgroundColor: getReportStatusColor(report.status) }}
+                      >
+                        {getReportStatusLabel(report.status)}
+                      </span>
+                    </div>
+                    <div className="report-date">
+                      {new Date(report.createdAt).toLocaleDateString('vi-VN')}
+                    </div>
+                  </div>
+
+                  <div className="report-content">
+                    <h4>{report.title}</h4>
+                    <div className="report-booking-info">
+                      <p><strong>Người giúp việc:</strong> {report.housekeeperName}</p>
+                      <p><strong>Dịch vụ:</strong> {report.service}</p>
+                      <p><strong>Ngày làm việc:</strong> {new Date(report.startDate).toLocaleDateString('vi-VN')}</p>
+                    </div>
+                    
+                    <div className="report-description">
+                      <p>{report.description}</p>
+                    </div>
+
+                    {report.adminResponse && (
+                      <div className="admin-response">
+                        <h5>Phản hồi từ quản trị viên:</h5>
+                        <p>{report.adminResponse}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="report-footer">
+                    <span className="report-id">Mã báo cáo: #{report.id}</span>
+                    {report.resolvedAt && (
+                      <span className="resolved-date">
+                        Giải quyết: {new Date(report.resolvedAt).toLocaleDateString('vi-VN')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Report Form Modal */}
+      {showReportForm && selectedBookingForReport && (
+        <ReportForm
+          booking={selectedBookingForReport}
+          onClose={() => {
+            setShowReportForm(false);
+            setSelectedBookingForReport(null);
+          }}
+          onSubmit={handleReportSubmit}
+        />
       )}
     </div>
   );

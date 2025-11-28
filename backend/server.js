@@ -2370,6 +2370,644 @@ app.put('/api/debug/fix-booking-customer/:bookingId', (req, res) => {
 });
 
 // ========================
+// REPORTS API - Báo cáo vi phạm
+// ========================
+
+// API: Tạo báo cáo vi phạm
+app.post('/api/reports', (req, res) => {
+  const { 
+    bookingId, 
+    customerId, 
+    housekeeperId, 
+    reportType, 
+    title, 
+    description, 
+    evidence, 
+    severity 
+  } = req.body;
+
+  // Validate required fields
+  if (!bookingId || !customerId || !housekeeperId || !reportType || !title || !description) {
+    return res.status(400).json({ 
+      error: 'Thiếu thông tin bắt buộc: bookingId, customerId, housekeeperId, reportType, title, description' 
+    });
+  }
+
+  // Validate reportType
+  const validReportTypes = ['late_arrival', 'no_show', 'inappropriate_behavior', 'poor_service', 'damage', 'other'];
+  if (!validReportTypes.includes(reportType)) {
+    return res.status(400).json({ 
+      error: 'Loại báo cáo không hợp lệ. Phải là: ' + validReportTypes.join(', ') 
+    });
+  }
+
+  // Validate severity
+  const validSeverities = ['low', 'medium', 'high', 'critical'];
+  if (severity && !validSeverities.includes(severity)) {
+    return res.status(400).json({ 
+      error: 'Mức độ nghiêm trọng không hợp lệ. Phải là: ' + validSeverities.join(', ') 
+    });
+  }
+
+  const sql = `INSERT INTO reports 
+    (bookingId, customerId, housekeeperId, reportType, title, description, evidence, severity, status, createdAt) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`;
+    
+  const values = [
+    bookingId, 
+    customerId, 
+    housekeeperId, 
+    reportType, 
+    title, 
+    description, 
+    evidence || null, 
+    severity || 'medium'
+  ];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Error creating report:', err);
+      return res.status(500).json({ error: 'Lỗi tạo báo cáo: ' + err.message });
+    }
+
+    console.log(`✅ Report created with ID: ${result.insertId}`);
+    
+    // Tạo notification cho admin về báo cáo mới
+    const adminNotificationSql = `INSERT INTO notifications 
+      (userId, type, title, message, data, createdAt) 
+      SELECT u.id, 'new_report', ?, ?, ?, NOW()
+      FROM users u WHERE u.role = 'admin'`;
+    
+    const notificationData = JSON.stringify({
+      reportId: result.insertId,
+      bookingId: bookingId,
+      reportType: reportType,
+      severity: severity || 'medium'
+    });
+
+    db.query(adminNotificationSql, [
+      'Báo cáo vi phạm mới',
+      `Khách hàng đã báo cáo vi phạm: ${title}`,
+      notificationData
+    ], (notifErr) => {
+      if (notifErr) {
+        console.error('Error creating admin notification:', notifErr);
+      } else {
+        console.log('✅ Admin notification created for new report');
+      }
+    });
+
+    res.status(201).json({
+      message: 'Báo cáo đã được tạo thành công',
+      reportId: result.insertId,
+      status: 'pending'
+    });
+  });
+});
+
+// API: Lấy danh sách báo cáo của customer
+app.get('/api/reports/customer/:customerId', (req, res) => {
+  const { customerId } = req.params;
+  const { status, page = 1, limit = 10 } = req.query;
+
+  let sql = `
+    SELECT r.*, 
+           b.service, b.startDate, b.customerName, b.housekeeperName,
+           u.fullName as housekeeperFullName, u.avatar as housekeeperAvatar
+    FROM reports r
+    LEFT JOIN bookings b ON r.bookingId = b.id
+    LEFT JOIN users u ON r.housekeeperId = u.id
+    WHERE r.customerId = ?
+  `;
+  const params = [customerId];
+
+  // Filter theo status nếu có
+  if (status) {
+    sql += ' AND r.status = ?';
+    params.push(status);
+  }
+
+  // Pagination
+  const offset = (page - 1) * limit;
+  sql += ' ORDER BY r.createdAt DESC LIMIT ? OFFSET ?';
+  params.push(parseInt(limit), parseInt(offset));
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error('Error fetching customer reports:', err);
+      return res.status(500).json({ error: 'Lỗi lấy danh sách báo cáo: ' + err.message });
+    }
+
+    // Get total count
+    const countSql = `SELECT COUNT(*) as total FROM reports WHERE customerId = ?${status ? ' AND status = ?' : ''}`;
+    const countParams = status ? [customerId, status] : [customerId];
+
+    db.query(countSql, countParams, (countErr, countResults) => {
+      if (countErr) {
+        console.error('Error counting customer reports:', countErr);
+        return res.status(500).json({ error: 'Lỗi đếm báo cáo: ' + countErr.message });
+      }
+
+      res.json({
+        reports: results,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(countResults[0].total / limit),
+          totalReports: countResults[0].total,
+          limit: parseInt(limit)
+        }
+      });
+    });
+  });
+});
+
+// API: Lấy tất cả báo cáo (cho admin)
+app.get('/api/reports', (req, res) => {
+  const { status, reportType, severity, page = 1, limit = 20 } = req.query;
+
+  let sql = `
+    SELECT r.*, 
+           b.service, b.startDate, b.customerName, b.housekeeperName,
+           c.fullName as customerFullName, c.email as customerEmail,
+           h.fullName as housekeeperFullName, h.email as housekeeperEmail
+    FROM reports r
+    LEFT JOIN bookings b ON r.bookingId = b.id
+    LEFT JOIN users c ON r.customerId = c.id
+    LEFT JOIN users h ON r.housekeeperId = h.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  // Filters
+  if (status) {
+    sql += ' AND r.status = ?';
+    params.push(status);
+  }
+
+  if (reportType) {
+    sql += ' AND r.reportType = ?';
+    params.push(reportType);
+  }
+
+  if (severity) {
+    sql += ' AND r.severity = ?';
+    params.push(severity);
+  }
+
+  // Pagination
+  const offset = (page - 1) * limit;
+  sql += ' ORDER BY r.createdAt DESC LIMIT ? OFFSET ?';
+  params.push(parseInt(limit), parseInt(offset));
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error('Error fetching all reports:', err);
+      return res.status(500).json({ error: 'Lỗi lấy danh sách báo cáo: ' + err.message });
+    }
+
+    // Get total count
+    let countSql = 'SELECT COUNT(*) as total FROM reports WHERE 1=1';
+    const countParams = [];
+
+    if (status) {
+      countSql += ' AND status = ?';
+      countParams.push(status);
+    }
+    if (reportType) {
+      countSql += ' AND reportType = ?';
+      countParams.push(reportType);
+    }
+    if (severity) {
+      countSql += ' AND severity = ?';
+      countParams.push(severity);
+    }
+
+    db.query(countSql, countParams, (countErr, countResults) => {
+      if (countErr) {
+        console.error('Error counting reports:', countErr);
+        return res.status(500).json({ error: 'Lỗi đếm báo cáo: ' + countErr.message });
+      }
+
+      res.json({
+        reports: results,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(countResults[0].total / limit),
+          totalReports: countResults[0].total,
+          limit: parseInt(limit)
+        }
+      });
+    });
+  });
+});
+
+// API: Cập nhật trạng thái báo cáo (cho admin)
+app.put('/api/reports/:reportId', (req, res) => {
+  const { reportId } = req.params;
+  const { status, adminResponse } = req.body;
+
+  // Validate status
+  const validStatuses = ['pending', 'investigating', 'resolved', 'dismissed'];
+  if (status && !validStatuses.includes(status)) {
+    return res.status(400).json({ 
+      error: 'Trạng thái không hợp lệ. Phải là: ' + validStatuses.join(', ') 
+    });
+  }
+
+  let sql = 'UPDATE reports SET updatedAt = NOW()';
+  const params = [];
+
+  if (status) {
+    sql += ', status = ?';
+    params.push(status);
+    
+    if (status === 'resolved' || status === 'dismissed') {
+      sql += ', resolvedAt = NOW()';
+    }
+  }
+
+  if (adminResponse) {
+    sql += ', adminResponse = ?';
+    params.push(adminResponse);
+  }
+
+  sql += ' WHERE id = ?';
+  params.push(reportId);
+
+  db.query(sql, params, (err, result) => {
+    if (err) {
+      console.error('Error updating report:', err);
+      return res.status(500).json({ error: 'Lỗi cập nhật báo cáo: ' + err.message });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy báo cáo' });
+    }
+
+    // Nếu có cập nhật status, gửi notification cho customer
+    if (status) {
+      const getReportSql = 'SELECT customerId, title FROM reports WHERE id = ?';
+      db.query(getReportSql, [reportId], (getErr, reportResults) => {
+        if (!getErr && reportResults.length > 0) {
+          const customerId = reportResults[0].customerId;
+          const reportTitle = reportResults[0].title;
+          
+          const notificationSql = `INSERT INTO notifications 
+            (userId, type, title, message, data, createdAt) 
+            VALUES (?, 'report_update', ?, ?, ?, NOW())`;
+          
+          const notificationData = JSON.stringify({
+            reportId: reportId,
+            newStatus: status,
+            adminResponse: adminResponse
+          });
+
+          const statusMessages = {
+            investigating: 'đang được điều tra',
+            resolved: 'đã được giải quyết',
+            dismissed: 'đã bị từ chối'
+          };
+
+          db.query(notificationSql, [
+            customerId,
+            'Cập nhật báo cáo vi phạm',
+            `Báo cáo "${reportTitle}" ${statusMessages[status] || 'đã được cập nhật'}`,
+            notificationData
+          ], (notifErr) => {
+            if (notifErr) {
+              console.error('Error creating customer notification:', notifErr);
+            } else {
+              console.log('✅ Customer notification created for report update');
+            }
+          });
+        }
+      });
+    }
+
+    res.json({
+      message: 'Báo cáo đã được cập nhật thành công',
+      reportId: reportId,
+      affectedRows: result.affectedRows
+    });
+  });
+});
+
+// API: Lấy chi tiết một báo cáo
+app.get('/api/reports/:reportId', (req, res) => {
+  const { reportId } = req.params;
+
+  const sql = `
+    SELECT r.*, 
+           b.service, b.startDate, b.customerName, b.housekeeperName, b.location, b.notes,
+           c.fullName as customerFullName, c.email as customerEmail, c.phone as customerPhone,
+           h.fullName as housekeeperFullName, h.email as housekeeperEmail, h.phone as housekeeperPhone
+    FROM reports r
+    LEFT JOIN bookings b ON r.bookingId = b.id
+    LEFT JOIN users c ON r.customerId = c.id
+    LEFT JOIN users h ON r.housekeeperId = h.id
+    WHERE r.id = ?
+  `;
+
+  db.query(sql, [reportId], (err, results) => {
+    if (err) {
+      console.error('Error fetching report details:', err);
+      return res.status(500).json({ error: 'Lỗi lấy chi tiết báo cáo: ' + err.message });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy báo cáo' });
+    }
+
+    res.json(results[0]);
+  });
+});
+
+// ========================
+// WARNINGS API - Cảnh cáo housekeeper
+// ========================
+
+// API: Gửi cảnh cáo đến housekeeper
+app.post('/api/warnings', (req, res) => {
+  const { 
+    housekeeperId, 
+    reportId, 
+    adminId, 
+    warningType, 
+    title, 
+    message, 
+    severity,
+    expiresAt 
+  } = req.body;
+
+  // Validate required fields
+  if (!housekeeperId || !reportId || !adminId || !title || !message) {
+    return res.status(400).json({ 
+      error: 'Thiếu thông tin bắt buộc: housekeeperId, reportId, adminId, title, message' 
+    });
+  }
+
+  // Validate warningType
+  const validWarningTypes = ['verbal', 'written', 'final', 'suspension'];
+  if (warningType && !validWarningTypes.includes(warningType)) {
+    return res.status(400).json({ 
+      error: 'Loại cảnh cáo không hợp lệ. Phải là: ' + validWarningTypes.join(', ') 
+    });
+  }
+
+  const sql = `INSERT INTO warnings 
+    (housekeeperId, reportId, adminId, warningType, title, message, severity, expiresAt, createdAt) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+    
+  const values = [
+    housekeeperId, 
+    reportId, 
+    adminId, 
+    warningType || 'written', 
+    title, 
+    message, 
+    severity || 'medium',
+    expiresAt || null
+  ];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Error creating warning:', err);
+      return res.status(500).json({ error: 'Lỗi tạo cảnh cáo: ' + err.message });
+    }
+
+    console.log(`✅ Warning created with ID: ${result.insertId} for housekeeper ${housekeeperId}`);
+    
+    // Tạo notification cho housekeeper về cảnh cáo mới
+    const notificationSql = `INSERT INTO notifications 
+      (userId, type, title, message, data, createdAt) 
+      VALUES (?, 'warning_received', ?, ?, ?, NOW())`;
+    
+    const notificationData = JSON.stringify({
+      warningId: result.insertId,
+      reportId: reportId,
+      warningType: warningType || 'written',
+      severity: severity || 'medium'
+    });
+
+    db.query(notificationSql, [
+      housekeeperId,
+      'Bạn đã nhận cảnh cáo từ quản trị viên',
+      `Cảnh cáo: ${title}`,
+      notificationData
+    ], (notifErr) => {
+      if (notifErr) {
+        console.error('Error creating housekeeper notification:', notifErr);
+      } else {
+        console.log('✅ Housekeeper notification created for warning');
+      }
+    });
+
+    // Nếu là suspension, tạm khóa tài khoản housekeeper
+    if (warningType === 'suspension' && expiresAt) {
+      const suspendSql = 'UPDATE users SET isApproved = FALSE WHERE id = ? AND role = "housekeeper"';
+      db.query(suspendSql, [housekeeperId], (suspendErr) => {
+        if (suspendErr) {
+          console.error('Error suspending housekeeper:', suspendErr);
+        } else {
+          console.log(`✅ Housekeeper ${housekeeperId} suspended until ${expiresAt}`);
+        }
+      });
+    }
+
+    res.status(201).json({
+      message: 'Cảnh cáo đã được gửi thành công',
+      warningId: result.insertId,
+      housekeeperId: housekeeperId
+    });
+  });
+});
+
+// API: Lấy danh sách cảnh cáo của housekeeper
+app.get('/api/warnings/housekeeper/:housekeeperId', (req, res) => {
+  const { housekeeperId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+
+  const sql = `
+    SELECT w.*, 
+           r.title as reportTitle, r.reportType,
+           a.fullName as adminName
+    FROM warnings w
+    LEFT JOIN reports r ON w.reportId = r.id
+    LEFT JOIN users a ON w.adminId = a.id
+    WHERE w.housekeeperId = ?
+    ORDER BY w.createdAt DESC
+    LIMIT ? OFFSET ?
+  `;
+
+  const offset = (page - 1) * limit;
+  const params = [housekeeperId, parseInt(limit), parseInt(offset)];
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error('Error fetching housekeeper warnings:', err);
+      return res.status(500).json({ error: 'Lỗi lấy danh sách cảnh cáo: ' + err.message });
+    }
+
+    // Get total count
+    const countSql = 'SELECT COUNT(*) as total FROM warnings WHERE housekeeperId = ?';
+    db.query(countSql, [housekeeperId], (countErr, countResults) => {
+      if (countErr) {
+        console.error('Error counting warnings:', countErr);
+        return res.status(500).json({ error: 'Lỗi đếm cảnh cáo: ' + countErr.message });
+      }
+
+      res.json({
+        warnings: results,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(countResults[0].total / limit),
+          totalWarnings: countResults[0].total,
+          limit: parseInt(limit)
+        }
+      });
+    });
+  });
+});
+
+// API: Lấy tất cả cảnh cáo (cho admin)
+app.get('/api/warnings', (req, res) => {
+  const { housekeeperId, warningType, severity, page = 1, limit = 20 } = req.query;
+
+  let sql = `
+    SELECT w.*, 
+           h.fullName as housekeeperName, h.email as housekeeperEmail,
+           a.fullName as adminName,
+           r.title as reportTitle, r.reportType
+    FROM warnings w
+    LEFT JOIN users h ON w.housekeeperId = h.id
+    LEFT JOIN users a ON w.adminId = a.id
+    LEFT JOIN reports r ON w.reportId = r.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  // Filters
+  if (housekeeperId) {
+    sql += ' AND w.housekeeperId = ?';
+    params.push(housekeeperId);
+  }
+
+  if (warningType) {
+    sql += ' AND w.warningType = ?';
+    params.push(warningType);
+  }
+
+  if (severity) {
+    sql += ' AND w.severity = ?';
+    params.push(severity);
+  }
+
+  // Pagination
+  const offset = (page - 1) * limit;
+  sql += ' ORDER BY w.createdAt DESC LIMIT ? OFFSET ?';
+  params.push(parseInt(limit), parseInt(offset));
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error('Error fetching all warnings:', err);
+      return res.status(500).json({ error: 'Lỗi lấy danh sách cảnh cáo: ' + err.message });
+    }
+
+    // Get total count
+    let countSql = 'SELECT COUNT(*) as total FROM warnings WHERE 1=1';
+    const countParams = [];
+
+    if (housekeeperId) {
+      countSql += ' AND housekeeperId = ?';
+      countParams.push(housekeeperId);
+    }
+    if (warningType) {
+      countSql += ' AND warningType = ?';
+      countParams.push(warningType);
+    }
+    if (severity) {
+      countSql += ' AND severity = ?';
+      countParams.push(severity);
+    }
+
+    db.query(countSql, countParams, (countErr, countResults) => {
+      if (countErr) {
+        console.error('Error counting warnings:', countErr);
+        return res.status(500).json({ error: 'Lỗi đếm cảnh cáo: ' + countErr.message });
+      }
+
+      res.json({
+        warnings: results,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(countResults[0].total / limit),
+          totalWarnings: countResults[0].total,
+          limit: parseInt(limit)
+        }
+      });
+    });
+  });
+});
+
+// API: Đánh dấu cảnh cáo đã đọc
+app.put('/api/warnings/:warningId/read', (req, res) => {
+  const { warningId } = req.params;
+
+  const sql = 'UPDATE warnings SET isRead = TRUE, readAt = NOW() WHERE id = ?';
+  
+  db.query(sql, [warningId], (err, result) => {
+    if (err) {
+      console.error('Error marking warning as read:', err);
+      return res.status(500).json({ error: 'Lỗi đánh dấu cảnh cáo: ' + err.message });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy cảnh cáo' });
+    }
+
+    res.json({
+      message: 'Đã đánh dấu cảnh cáo là đã đọc',
+      warningId: warningId
+    });
+  });
+});
+
+// API: Lấy thống kê cảnh cáo của housekeeper
+app.get('/api/warnings/stats/:housekeeperId', (req, res) => {
+  const { housekeeperId } = req.params;
+
+  const sql = `
+    SELECT 
+      COUNT(*) as totalWarnings,
+      COUNT(CASE WHEN warningType = 'verbal' THEN 1 END) as verbalWarnings,
+      COUNT(CASE WHEN warningType = 'written' THEN 1 END) as writtenWarnings,
+      COUNT(CASE WHEN warningType = 'final' THEN 1 END) as finalWarnings,
+      COUNT(CASE WHEN warningType = 'suspension' THEN 1 END) as suspensions,
+      COUNT(CASE WHEN severity = 'critical' THEN 1 END) as criticalWarnings,
+      COUNT(CASE WHEN createdAt >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as recentWarnings
+    FROM warnings 
+    WHERE housekeeperId = ?
+  `;
+
+  db.query(sql, [housekeeperId], (err, results) => {
+    if (err) {
+      console.error('Error fetching warning stats:', err);
+      return res.status(500).json({ error: 'Lỗi lấy thống kê cảnh cáo: ' + err.message });
+    }
+
+    res.json(results[0] || {
+      totalWarnings: 0,
+      verbalWarnings: 0,
+      writtenWarnings: 0,
+      finalWarnings: 0,
+      suspensions: 0,
+      criticalWarnings: 0,
+      recentWarnings: 0
+    });
+  });
+});
+
+// ========================
 // ADMIN DASHBOARD APIs
 // ========================
 

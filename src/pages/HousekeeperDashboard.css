@@ -574,3 +574,266 @@
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
+/* Dashboard Tabs */
+.dashboard-tabs {
+  display: flex;
+  background: white;
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 16px 20px;
+  border: none;
+  background: #f8f9fa;
+  color: #6c757d;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.tab-btn.active {
+  background: white;
+  color: #4285F4;
+  border-bottom-color: #4285F4;
+  font-weight: 600;
+}
+
+/* Warnings Section */
+.warnings-section {
+  background: white;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+}
+
+.warnings-section .section-header h2 {
+  margin: 0 0 8px 0;
+  color: #dc3545;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.warnings-section .section-description {
+  color: #6c757d;
+  margin: 0 0 25px 0;
+  font-size: 0.95rem;
+}
+
+.no-warnings {
+  text-align: center;
+  padding: 60px 20px;
+  color: #28a745;
+}
+
+.no-warnings-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  opacity: 0.8;
+}
+
+.no-warnings h3 {
+  margin: 0 0 10px;
+  color: #28a745;
+  font-size: 1.5rem;
+}
+
+.no-warnings p {
+  margin: 0;
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.6;
+  color: #6c757d;
+}
+
+/* Warnings List */
+.warnings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.warning-card {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.warning-card.unread {
+  border-left: 4px solid #dc3545;
+  background: #fff5f5;
+}
+
+.warning-card:hover {
+  border-color: #dc3545;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.1);
+}
+
+.warning-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.warning-type {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.type-badge,
+.severity-badge {
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.warning-date {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.warning-content h4 {
+  margin: 0 0 10px 0;
+  color: #dc3545;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.warning-message {
+  margin: 0 0 15px 0;
+  line-height: 1.6;
+  color: #495057;
+}
+
+.related-report {
+  background: #e7f3ff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  border-left: 3px solid #007bff;
+}
+
+.related-report small {
+  color: #0056b3;
+}
+
+.warning-expiry {
+  background: #fff3cd;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-left: 3px solid #ffc107;
+}
+
+.warning-expiry small {
+  color: #856404;
+}
+
+.warning-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e9ecef;
+  font-size: 0.85rem;
+}
+
+.admin-name {
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.unread-indicator {
+  background: #dc3545;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.read-time {
+  color: #28a745;
+  font-weight: 500;
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #6c757d;
+}
+
+.loading-state .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e9ecef;
+  border-top: 3px solid #dc3545;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-tabs {
+    flex-direction: column;
+  }
+  
+  .tab-btn {
+    border-bottom: none;
+    border-right: 3px solid transparent;
+  }
+  
+  .tab-btn.active {
+    border-bottom: none;
+    border-right-color: #4285F4;
+  }
+  
+  .warning-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .warning-type {
+    flex-wrap: wrap;
+  }
+  
+  .warning-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .warnings-section {
+    padding: 20px;
+  }
+}
+
