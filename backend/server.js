@@ -29,8 +29,28 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Serve static files from uploads directory
+// Serve static files from uploads directory with fallback
 app.use('/uploads', express.static(uploadsDir));
+
+// Middleware to handle missing files with placeholder
+app.use('/uploads', (req, res, next) => {
+  const filePath = path.join(uploadsDir, req.path);
+  
+  // Check if file exists
+  if (!fs.existsSync(filePath)) {
+    console.log(`⚠️ File not found: ${filePath}`);
+    
+    // Return a placeholder response for missing images
+    res.status(404).json({
+      error: 'File not found',
+      message: 'Tài liệu không tồn tại hoặc đã bị xóa',
+      path: req.path
+    });
+    return;
+  }
+  
+  next();
+});
 
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
@@ -779,13 +799,27 @@ app.post('/api/verification/submit', (req, res) => {
       if (documents && documents.length > 0) {
         const documentPromises = documents.map(doc => {
           return new Promise((resolve, reject) => {
+            // Validate required fields
+            if (!doc.path || !doc.type || !doc.originalName) {
+              console.error('Invalid document data:', doc);
+              reject(new Error(`Invalid document data: missing path, type, or originalName`));
+              return;
+            }
+            
             const docSql = `INSERT INTO verification_documents 
               (userId, documentType, filePath, originalName) 
               VALUES (?, ?, ?, ?)`;
             
+            console.log('Inserting document:', { userId, type: doc.type, path: doc.path, originalName: doc.originalName });
+            
             db.query(docSql, [userId, doc.type, doc.path, doc.originalName], (err, result) => {
-              if (err) reject(err);
-              else resolve(result);
+              if (err) {
+                console.error('Database error inserting document:', err);
+                reject(err);
+              } else {
+                console.log('Document inserted successfully:', result.insertId);
+                resolve(result);
+              }
             });
           });
         });
@@ -1079,6 +1113,53 @@ app.post('/api/admin/verification/:requestId/review', (req, res) => {
           newStatus: newStatus
         });
       });
+    });
+  });
+});
+
+// API: Admin - Get verification documents by request ID
+app.get('/api/admin/verification/:requestId/documents', (req, res) => {
+  const { requestId } = req.params;
+  
+  console.log('📄 Fetching documents for request:', requestId);
+  
+  // First get the userId from the verification request
+  const requestSql = 'SELECT userId FROM verification_requests WHERE id = ?';
+  
+  db.query(requestSql, [requestId], (err, requestResults) => {
+    if (err) {
+      console.error('Error fetching verification request:', err);
+      return res.status(500).json({ error: 'Lỗi lấy thông tin yêu cầu', message: err.message });
+    }
+    
+    if (requestResults.length === 0) {
+      return res.status(404).json({ error: 'Yêu cầu xác thực không tồn tại' });
+    }
+    
+    const userId = requestResults[0].userId;
+    
+    // Get documents for this user
+    const documentsSql = `
+      SELECT 
+        id,
+        documentType as type,
+        filePath as url,
+        originalName,
+        uploadedAt,
+        status
+      FROM verification_documents 
+      WHERE userId = ? 
+      ORDER BY uploadedAt DESC
+    `;
+    
+    db.query(documentsSql, [userId], (docErr, documents) => {
+      if (docErr) {
+        console.error('Error fetching verification documents:', docErr);
+        return res.status(500).json({ error: 'Lỗi lấy tài liệu xác minh', message: docErr.message });
+      }
+      
+      console.log(`📊 Found ${documents.length} documents for user ${userId}`);
+      res.json(documents);
     });
   });
 });

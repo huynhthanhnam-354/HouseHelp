@@ -17,6 +17,13 @@ export default function Header({ keyword, setKeyword, onSearch }) {
   const handleLogin = () => navigate("/login");
   const handleRegister = () => navigate("/register");
   const handleLogout = () => {
+    // Show a brief loading state
+    const logoutBtn = document.querySelector('.dropdown-item.logout');
+    if (logoutBtn) {
+      logoutBtn.innerHTML = '<span class="dropdown-icon">⏳</span>Đang đăng xuất...';
+      logoutBtn.disabled = true;
+    }
+    
     logout();
     setShowDropdown(false);
   };

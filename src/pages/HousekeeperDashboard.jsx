@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import translations from '../locales/translations';
 import BookingCompletion from '../components/BookingCompletion';
 import VerificationStatus from '../components/VerificationStatus';
+import ResubmitVerificationForm from '../components/ResubmitVerificationForm';
+import InitialVerificationForm from '../components/InitialVerificationForm';
 import './HousekeeperDashboard.css';
 
 export default function HousekeeperDashboard() {
@@ -21,33 +23,27 @@ export default function HousekeeperDashboard() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [verificationStatus, setVerificationStatus] = useState({ isVerified: false, isApproved: false });
   const [forceUpdate, setForceUpdate] = useState(0);
+  const [verificationRequest, setVerificationRequest] = useState(null);
+  const [showResubmitForm, setShowResubmitForm] = useState(false);
+  const [showResubmitModal, setShowResubmitModal] = useState(false);
+  const [showInitialVerificationForm, setShowInitialVerificationForm] = useState(false);
 
-  // Kiểm tra trạng thái xác minh của housekeeper
+  // Kiểm tra trạng thái xác minh và yêu cầu bổ sung của housekeeper
   useEffect(() => {
     const checkVerificationStatus = async () => {
       if (!user?.id) return;
       
       try {
         console.log('🔍 Checking verification status for user:', user.id);
-        console.log('👤 Full user object:', user);
-        const response = await fetch(`http://localhost:5000/api/admin/housekeepers/status`);
-        if (response.ok) {
-          const housekeepers = await response.json();
-          console.log('📋 All housekeepers:', housekeepers);
-          console.log('🔍 Looking for user ID:', user.id, 'in housekeepers list');
-          
-          // Try both user.id and exact match
+        
+        // Check verification status
+        const statusResponse = await fetch(`http://localhost:5000/api/admin/housekeepers/status`);
+        if (statusResponse.ok) {
+          const housekeepers = await statusResponse.json();
           let currentHousekeeper = housekeepers.find(hk => hk.id === user.id);
           if (!currentHousekeeper) {
-            console.log('❌ Not found by hk.id, trying by email...');
             currentHousekeeper = housekeepers.find(hk => hk.email === user.email);
           }
-          if (!currentHousekeeper) {
-            console.log('❌ Not found by email, trying by fullName...');
-            currentHousekeeper = housekeepers.find(hk => hk.fullName === user.fullName);
-          }
-          
-          console.log('👤 Current housekeeper found:', currentHousekeeper);
           
           if (currentHousekeeper) {
             const newStatus = {
@@ -56,14 +52,26 @@ export default function HousekeeperDashboard() {
             };
             console.log('✅ Setting verification status:', newStatus);
             setVerificationStatus(newStatus);
-            // Force component re-render
-            setForceUpdate(prev => prev + 1);
-          } else {
-            console.log('❌ No housekeeper found for current user');
-            // Set default unverified status if not found
-            setVerificationStatus({ isVerified: false, isApproved: false });
           }
         }
+
+        // Check for verification request status
+        const requestResponse = await fetch(`http://localhost:5000/api/verification/status/${user.id}`);
+        if (requestResponse.ok) {
+          const requestData = await requestResponse.json();
+          console.log('📋 Verification request data:', requestData);
+          
+          if (requestData.hasRequest && requestData.request) {
+            setVerificationRequest(requestData.request);
+            
+            // If admin requested more info, show resubmit form
+            if (requestData.request.status === 'requires_more_info') {
+              setShowResubmitForm(true);
+            }
+          }
+        }
+        
+        setForceUpdate(prev => prev + 1);
       } catch (error) {
         console.error('Error checking verification status:', error);
       }
@@ -308,8 +316,58 @@ export default function HousekeeperDashboard() {
 
 
 
+      {/* Thông báo yêu cầu bổ sung thông tin */}
+      {showResubmitForm && verificationRequest && (
+        <div className="resubmit-request-section">
+          <div className="resubmit-card">
+            <h3>📝 Admin yêu cầu bổ sung thông tin</h3>
+            <div className="admin-message">
+              <p><strong>Thông báo từ admin:</strong></p>
+              <div className="admin-notes">
+                {verificationRequest.adminNotes || 'Admin yêu cầu bạn bổ sung thêm thông tin xác minh.'}
+              </div>
+            </div>
+            
+            <div className="resubmit-actions">
+              <button
+                className="resubmit-btn"
+                onClick={() => setShowResubmitModal(true)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: '600'
+                }}
+              >
+                📤 Bổ sung thông tin ngay
+              </button>
+              <button
+                className="dismiss-btn"
+                onClick={() => setShowResubmitForm(false)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  marginLeft: '12px'
+                }}
+              >
+                Để sau
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Thông báo trạng thái xác minh */}
-      {(!verificationStatus.isVerified || !verificationStatus.isApproved) && (
+      {(!verificationStatus.isVerified || !verificationStatus.isApproved) && !showResubmitForm && (
         <div className="verification-warning">
           <div className="warning-card">
             <h3>⚠️ Tài khoản chưa được xác minh</h3>
@@ -321,7 +379,32 @@ export default function HousekeeperDashboard() {
                 : "Tài khoản của bạn chưa được phê duyệt bởi admin. Vui lòng chờ admin phê duyệt."
               }
             </p>
-            <p>Vui lòng liên hệ admin để được hỗ trợ.</p>
+            
+            {/* Hiển thị nút gửi yêu cầu nếu chưa có request nào */}
+            {!verificationRequest ? (
+              <div className="verification-actions">
+                <p><strong>Bạn chưa gửi yêu cầu xét duyệt nào.</strong></p>
+                <button
+                  className="submit-verification-btn"
+                  onClick={() => setShowInitialVerificationForm(true)}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    marginTop: '12px'
+                  }}
+                >
+                  📤 Gửi yêu cầu xét duyệt
+                </button>
+              </div>
+            ) : (
+              <p>Vui lòng chờ admin xem xét yêu cầu của bạn.</p>
+            )}
           </div>
         </div>
       )}
@@ -535,6 +618,28 @@ export default function HousekeeperDashboard() {
           </div>
         )}
       </div>
+
+      {/* Resubmit Verification Modal */}
+      {showResubmitModal && verificationRequest && (
+        <ResubmitVerificationForm
+          verificationRequest={verificationRequest}
+          onClose={() => setShowResubmitModal(false)}
+          onSuccess={() => {
+            setShowResubmitForm(false);
+            setRefreshTrigger(prev => prev + 1);
+          }}
+        />
+      )}
+
+      {/* Initial Verification Modal */}
+      {showInitialVerificationForm && (
+        <InitialVerificationForm
+          onClose={() => setShowInitialVerificationForm(false)}
+          onSuccess={() => {
+            setRefreshTrigger(prev => prev + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

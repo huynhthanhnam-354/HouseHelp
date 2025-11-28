@@ -1,6 +1,117 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
+// Component để hiển thị document với error handling
+const DocumentViewer = ({ doc, index }) => {
+  const [imageError, setImageError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const handleImageLoad = () => {
+    setIsLoading(false);
+  };
+
+  const handleImageError = () => {
+    console.error('Image load error:', doc.url);
+    setImageError(true);
+    setIsLoading(false);
+  };
+
+  const imageUrl = `http://localhost:5000${doc.url}`;
+
+  return (
+    <div>
+      {!imageError ? (
+        <>
+          {isLoading && (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '20px', 
+              color: '#6b7280',
+              fontSize: '12px',
+              fontStyle: 'italic',
+              backgroundColor: '#f9fafb',
+              borderRadius: '4px',
+              marginBottom: '8px'
+            }}>
+              ⏳ Đang tải...
+            </div>
+          )}
+          <img 
+            src={imageUrl}
+            alt={`Verification document ${index + 1}`}
+            style={{
+              width: '100%',
+              height: '120px',
+              objectFit: 'cover',
+              borderRadius: '4px',
+              marginBottom: '8px',
+              cursor: 'pointer',
+              border: '1px solid #e5e7eb',
+              display: imageError ? 'none' : 'block'
+            }}
+            onClick={() => window.open(imageUrl, '_blank')}
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+          />
+        </>
+      ) : (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '20px', 
+          color: '#dc2626',
+          fontSize: '12px',
+          fontStyle: 'italic',
+          backgroundColor: '#fef2f2',
+          borderRadius: '4px',
+          marginBottom: '8px',
+          border: '1px solid #fecaca'
+        }}>
+          ❌ Tài liệu không tồn tại<br/>
+          <span style={{ fontSize: '10px', color: '#6b7280' }}>
+            {doc.url}
+          </span>
+        </div>
+      )}
+      
+      <button
+        onClick={() => window.open(imageUrl, '_blank')}
+        disabled={imageError}
+        style={{
+          width: '100%',
+          padding: '6px 12px',
+          backgroundColor: imageError ? '#9ca3af' : '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          fontSize: '12px',
+          cursor: imageError ? 'not-allowed' : 'pointer'
+        }}
+      >
+        {imageError ? '❌ Không khả dụng' : '🔍 Xem chi tiết'}
+      </button>
+      
+      <div style={{ 
+        fontSize: '10px', 
+        color: '#6b7280', 
+        marginTop: '4px',
+        wordBreak: 'break-all'
+      }}>
+        {doc.originalName || 'Không có tên file'}
+      </div>
+      
+      {doc.uploadedAt && (
+        <div style={{ 
+          fontSize: '9px', 
+          color: '#9ca3af', 
+          marginTop: '2px'
+        }}>
+          Tải lên: {new Date(doc.uploadedAt).toLocaleDateString('vi-VN')}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminVerificationPanel = () => {
   const { user } = useAuth();
   const [verificationRequests, setVerificationRequests] = useState([]);
@@ -34,7 +145,26 @@ const AdminVerificationPanel = () => {
       
       if (response.ok) {
         const data = await response.json();
-        setVerificationRequests(data);
+        
+        // Fetch documents for each request using userId
+        const requestsWithDocuments = await Promise.all(
+          data.map(async (request) => {
+            try {
+              const docResponse = await fetch(`http://localhost:5000/api/admin/verification/${request.id}/documents`);
+              if (docResponse.ok) {
+                const documents = await docResponse.json();
+                console.log(`📄 Fetched ${documents.length} documents for user ${request.userId}`);
+                return { ...request, documents };
+              }
+              return { ...request, documents: [] };
+            } catch (error) {
+              console.error(`Error fetching documents for request ${request.id}:`, error);
+              return { ...request, documents: [] };
+            }
+          })
+        );
+        
+        setVerificationRequests(requestsWithDocuments);
       } else {
         console.error('Error fetching verification requests');
       }
@@ -129,11 +259,12 @@ const AdminVerificationPanel = () => {
 
   return (
     <div style={{
-      backgroundColor: '#fff',
+      backgroundColor: '#ffffff',
       border: '1px solid #e5e7eb',
       borderRadius: '12px',
       padding: '24px',
-      margin: '20px 0'
+      margin: '20px 0',
+      minHeight: '100vh'
     }}>
       <div style={{
         display: 'flex',
@@ -141,7 +272,7 @@ const AdminVerificationPanel = () => {
         alignItems: 'center',
         marginBottom: '24px'
       }}>
-        <h2 style={{ margin: 0, color: '#1f2937' }}>
+        <h2 style={{ margin: 0, color: '#1f2937 !important' }}>
           👨‍💼 Quản lý xác thực tài khoản
         </h2>
         
@@ -336,6 +467,65 @@ const AdminVerificationPanel = () => {
                   </div>
                 </div>
               )}
+
+              {/* Verification Documents */}
+              <div style={{
+                padding: '16px',
+                backgroundColor: 'white',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                marginBottom: '20px'
+              }}>
+                <h4 style={{ margin: '0 0 16px 0', color: '#1f2937', fontSize: '16px', fontWeight: '600' }}>
+                  📄 Tài liệu xác minh ({selectedRequest.documentCount || 0})
+                </h4>
+                
+                {selectedRequest.documents && selectedRequest.documents.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+                    {selectedRequest.documents.map((doc, index) => (
+                      <div key={index} style={{
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        backgroundColor: '#f9fafb'
+                      }}>
+                        <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', color: '#374151' }}>
+                          {doc.type || `Tài liệu ${index + 1}`}
+                        </div>
+                        
+                        {doc.url ? (
+                          <DocumentViewer 
+                            doc={doc} 
+                            index={index}
+                          />
+                        ) : (
+                          <div style={{ 
+                            textAlign: 'center', 
+                            padding: '20px', 
+                            color: '#6b7280',
+                            fontSize: '12px',
+                            fontStyle: 'italic'
+                          }}>
+                            Không có hình ảnh
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '40px', 
+                    color: '#6b7280',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '8px',
+                    border: '2px dashed #d1d5db'
+                  }}>
+                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>📄</div>
+                    <div>Chưa có tài liệu xác minh nào được tải lên</div>
+                  </div>
+                )}
+              </div>
 
               {/* Review Form */}
               <div style={{ display: 'grid', gap: '16px' }}>

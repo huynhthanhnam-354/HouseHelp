@@ -659,16 +659,14 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {userGrowth.reduce((acc, growth) => {
+                      {userGrowth.filter(growth => growth.role !== 'admin').reduce((acc, growth) => {
                         const existing = acc.find(item => item.month === growth.month);
                         if (existing) {
                           existing[growth.role] = growth.count;
-                          existing.total += growth.count;
                         } else {
                           acc.push({
                             month: growth.month,
-                            [growth.role]: growth.count,
-                            total: growth.count
+                            [growth.role]: growth.count
                           });
                         }
                         return acc;
@@ -677,7 +675,7 @@ const AdminDashboard = () => {
                           <td>{row.month}</td>
                           <td>{row.customer || 0}</td>
                           <td>{row.housekeeper || 0}</td>
-                          <td><strong>{row.total}</strong></td>
+                          <td><strong>{(row.customer || 0) + (row.housekeeper || 0)}</strong></td>
                         </tr>
                       ))}
                     </tbody>

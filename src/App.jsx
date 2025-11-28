@@ -17,6 +17,33 @@ import ToastContainer from "./components/ToastContainer";
 import ChatbotButton from "./components/Chatbot/ChatbotButton";
 import './App.css';
 
+// Component wrapper để handle admin redirect
+function HomePageWrapper() {
+  // Kiểm tra user từ localStorage
+  const checkUserRole = () => {
+    try {
+      const userData = localStorage.getItem("househelp_user");
+      if (userData && userData !== "null" && userData !== "undefined") {
+        const parsedUser = JSON.parse(userData);
+        return parsedUser.role;
+      }
+    } catch (error) {
+      console.error("Error checking user role:", error);
+    }
+    return null;
+  };
+
+  const userRole = checkUserRole();
+  
+  // Nếu là admin, redirect đến admin dashboard
+  if (userRole === 'admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+  
+  // Nếu không phải admin, hiển thị trang chủ bình thường
+  return <HomePage />;
+}
+
 export default function App() {
   return (
     <LanguageProvider>
@@ -26,7 +53,7 @@ export default function App() {
             <Routes>
               <Route path="/login" element={<AuthPage mode="login" />} />
               <Route path="/register" element={<AuthPage mode="register" />} />
-              <Route path="/" element={<HomePage />} />
+              <Route path="/" element={<HomePageWrapper />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/booking/:housekeeperId" element={<BookingDetailPage />} />
               <Route path="/booking-detail/:bookingId" element={<BookingDetailPage />} />

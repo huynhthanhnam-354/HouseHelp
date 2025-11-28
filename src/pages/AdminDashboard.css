@@ -2,7 +2,7 @@
 .admin-dashboard.modern {
   display: flex;
   min-height: 100vh;
-  background: #f8fafc;
+  background: #ffffff !important;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -167,6 +167,7 @@
   padding: 40px;
   flex: 1;
   overflow-y: auto;
+  background: #ffffff !important;
 }
 
 /* Stats Grid */
@@ -328,13 +329,53 @@
   margin: 0 0 24px 0;
   font-size: 22px;
   font-weight: 800;
-  color: #000000 !important;
+  color: #1f2937 !important;
   text-align: left;
   padding-bottom: 12px;
   border-bottom: 3px solid #4f46e5;
   text-shadow: none;
   letter-spacing: 0.5px;
   background: transparent !important;
+}
+
+/* Đảm bảo tất cả text đều có màu đen và background trắng */
+.admin-dashboard {
+  background: #ffffff !important;
+}
+
+.admin-dashboard * {
+  color: #1f2937 !important;
+}
+
+.admin-dashboard .admin-main {
+  background: #ffffff !important;
+}
+
+.admin-dashboard .stat-content h3 {
+  color: #64748b !important;
+}
+
+.admin-dashboard .stat-number {
+  color: #1a202c !important;
+}
+
+.admin-dashboard .legend-item span,
+.admin-dashboard .bar-label,
+.admin-dashboard .line-labels span,
+.admin-dashboard .activity-content h4,
+.admin-dashboard .activity-content p,
+.admin-dashboard .user-name,
+.admin-dashboard .user-meta,
+.admin-dashboard .user-email {
+  color: #1f2937 !important;
+}
+
+.admin-dashboard .no-comment {
+  color: #9ca3af !important;
+}
+
+.admin-dashboard .date-text {
+  color: #6b7280 !important;
 }
 
 /* Pie Chart */
@@ -522,6 +563,7 @@
 .users-content {
   padding: 40px;
   flex: 1;
+  background: #ffffff !important;
 }
 
 .users-table {
@@ -675,6 +717,7 @@
 .bookings-content {
   padding: 40px;
   flex: 1;
+  background: #ffffff !important;
 }
 
 .booking-stats-grid {
@@ -709,7 +752,7 @@
 .analytics-content {
   padding: 40px;
   flex: 1;
-  background: #f8fafc;
+  background: #ffffff !important;
   min-height: 100vh;
 }
 
@@ -771,7 +814,7 @@
 .reviews-content {
   padding: 40px;
   flex: 1;
-  background: #f8fafc;
+  background: #ffffff !important;
   min-height: 100vh;
 }
 
@@ -1227,4 +1270,31 @@
   .action-btn {
     width: 100%;
   }
+}
+
+/* Verification Content */
+.verification-content {
+  padding: 40px;
+  flex: 1;
+  background: #ffffff !important;
+  min-height: 100vh;
+}
+
+/* Đảm bảo tất cả section có background trắng */
+.admin-dashboard .dashboard-content,
+.admin-dashboard .users-content,
+.admin-dashboard .bookings-content,
+.admin-dashboard .analytics-content,
+.admin-dashboard .reviews-content,
+.admin-dashboard .verification-content {
+  background: #ffffff !important;
+}
+
+/* Override any dark backgrounds */
+.admin-dashboard .admin-main * {
+  background-color: inherit;
+}
+
+.admin-dashboard .admin-main {
+  background: #ffffff !important;
 }

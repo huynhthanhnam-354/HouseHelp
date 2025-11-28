@@ -121,12 +121,7 @@ export default function HousekeeperCard({ hk }) {
       </div>
 
       <div className="hk-actions">
-        {isHousekeeperUser ? (
-          <div className="hk-info-message">
-            <span className="info-icon">👀</span>
-            <span className="info-text">Chỉ xem thông tin</span>
-          </div>
-        ) : (
+        {!isHousekeeperUser && (
           <button className="hk-book-btn" onClick={handleBookNow}>
             {t.bookNow}
           </button>

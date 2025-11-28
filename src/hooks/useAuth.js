@@ -47,7 +47,14 @@ export const useAuth = () => {
     setUser(null);
     setIsAuthenticated(false);
     setRefreshTrigger(prev => prev + 1); // Trigger refresh for all instances
-    navigate("/");
+    
+    // Clear all application state and navigate to home
+    console.log("🔄 Performing clean logout with automatic refresh");
+    
+    // Use window.location.href for a clean navigation that resets all state
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 100);
   };
 
   // Check authentication directly from localStorage to avoid state timing issues
