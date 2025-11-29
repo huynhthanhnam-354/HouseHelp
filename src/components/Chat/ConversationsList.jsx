@@ -20,7 +20,6 @@ const ConversationsList = ({ onSelectConversation, refreshTrigger }) => {
         const data = await response.json();
         setConversations(data);
         console.log(`📋 Loaded ${data.length} conversations`);
-        console.log('📋 Conversations data:', data);
       }
     } catch (error) {
       console.error('Error fetching conversations:', error);

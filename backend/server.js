@@ -2418,18 +2418,19 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   // User joins with their ID and role
-  socket.on('join', ({ userId, role }) => {
+  socket.on('join', ({ userId, role, userName }) => {
     // Store user with both string and number keys to handle type mismatches
     const userIdStr = String(userId);
     const userIdNum = parseInt(userId);
     
-    const userInfo = { socketId: socket.id, role, userId: userId };
+    const userInfo = { socketId: socket.id, role, userId: userId, userName };
     activeUsers.set(userId, userInfo);
     activeUsers.set(userIdStr, userInfo);
     activeUsers.set(userIdNum, userInfo);
     
     socket.userId = userId;
     socket.role = role;
+    socket.userName = userName;
     
     // Cập nhật trạng thái available cho housekeeper khi đăng nhập
     if (role === 'housekeeper') {
@@ -2468,6 +2469,75 @@ io.on('connection', (socket) => {
       activeUsers.delete(userIdNum);
       
       console.log(`❌ User ${socket.userId} disconnected. Active users: ${activeUsers.size}`);
+    }
+  });
+
+  // Call signaling handlers
+  socket.on('call_offer', ({ targetUserId, offer, isVideoCall, callerId }) => {
+    console.log(`📞 Call offer from ${callerId || socket.userId} to ${targetUserId}`);
+    console.log(`📞 Caller name: ${socket.userName}`);
+    console.log(`📞 Active users:`, Array.from(activeUsers.keys()));
+    
+    const actualCallerId = callerId || socket.userId;
+    const targetUser = activeUsers.get(targetUserId) || activeUsers.get(String(targetUserId)) || activeUsers.get(parseInt(targetUserId));
+    
+    if (targetUser) {
+      const callData = {
+        callerId: actualCallerId,
+        callerName: socket.userName || 'Người dùng',
+        offer,
+        isVideoCall
+      };
+      
+      io.to(targetUser.socketId).emit('incoming_call', callData);
+      console.log(`✅ Call offer sent to ${targetUserId}:`, callData);
+    } else {
+      socket.emit('call_failed', { error: 'User not available' });
+      console.log(`❌ Target user ${targetUserId} not found or offline`);
+      console.log(`❌ Available users:`, Array.from(activeUsers.keys()));
+    }
+  });
+
+  socket.on('call_answer', ({ targetUserId, answer }) => {
+    console.log(`📞 Call answer from ${socket.userId} to ${targetUserId}`);
+    
+    const targetUser = activeUsers.get(targetUserId) || activeUsers.get(String(targetUserId)) || activeUsers.get(parseInt(targetUserId));
+    
+    if (targetUser) {
+      io.to(targetUser.socketId).emit('call_answer', { answer });
+      console.log(`✅ Call answer sent to ${targetUserId}`);
+    }
+  });
+
+  socket.on('call_rejected', ({ targetUserId }) => {
+    console.log(`📞 Call rejected by ${socket.userId} to ${targetUserId}`);
+    
+    const targetUser = activeUsers.get(targetUserId) || activeUsers.get(String(targetUserId)) || activeUsers.get(parseInt(targetUserId));
+    
+    if (targetUser) {
+      io.to(targetUser.socketId).emit('call_rejected', { userId: socket.userId });
+      console.log(`✅ Call rejection sent to ${targetUserId}`);
+    }
+  });
+
+  socket.on('ice_candidate', ({ candidate, targetUserId }) => {
+    const targetUser = activeUsers.get(targetUserId) || activeUsers.get(String(targetUserId)) || activeUsers.get(parseInt(targetUserId));
+    
+    if (targetUser) {
+      io.to(targetUser.socketId).emit('ice_candidate', { candidate });
+    }
+  });
+
+  socket.on('call_ended', ({ targetUserId }) => {
+    console.log(`📞 Call ended by ${socket.userId}`);
+    
+    if (targetUserId) {
+      const targetUser = activeUsers.get(targetUserId) || activeUsers.get(String(targetUserId)) || activeUsers.get(parseInt(targetUserId));
+      
+      if (targetUser) {
+        io.to(targetUser.socketId).emit('call_ended');
+        console.log(`✅ Call end notification sent to ${targetUserId}`);
+      }
     }
   });
 });
@@ -4189,8 +4259,12 @@ app.get('/api/users/:userId/conversations', (req, res) => {
       b.id as bookingId,
       b.service,
       b.status as bookingStatus,
+      b.customerId,
+      b.housekeeperId,
+      b.customerName,
+      b.housekeeperName,
       CASE 
-        WHEN b.customerId = ? THEN b.housekeeperId
+        WHEN b.customerId = ? THEN COALESCE(h.userId, b.housekeeperId)
         ELSE b.customerId
       END as otherUserId,
       CASE 
@@ -4220,17 +4294,19 @@ app.get('/api/users/:userId/conversations', (req, res) => {
          '1970-01-01'
        )) as unreadCount
     FROM bookings b
-    WHERE (b.customerId = ? OR b.housekeeperId = ?)
+    LEFT JOIN housekeepers h ON b.housekeeperId = h.id
+    WHERE (b.customerId = ? OR h.userId = ?)
     AND EXISTS (SELECT 1 FROM chat_messages cm WHERE cm.bookingId = b.id)
     ORDER BY lastMessageTime DESC
   `;
   
-  db.query(sql, [userId, userId, userId, userId, userId, userId, userId], (err, results) => {
+  db.query(sql, [userId, userId, userId, userId, userId, userId, userId, userId], (err, results) => {
     if (err) {
       console.error('Error fetching conversations:', err);
       return res.status(500).json({ error: err.message });
     }
     console.log(`📋 Found ${results.length} conversations for user ${userId}`);
+    console.log(`📋 API /api/users/${userId}/conversations returned:`, JSON.stringify(results, null, 2));
     res.json(results);
   });
 });
