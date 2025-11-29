@@ -240,7 +240,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  background: #f8f9fa;
+  background: #2a2a2a;
 }
 
 .suggestion-btn {
