@@ -18,25 +18,41 @@
 }
 
 .back-button {
-  background: none;
-  border: none;
-  padding: 8px;
-  margin-right: 16px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  padding: 6px 8px;
+  margin-right: 12px;
   cursor: pointer;
-  border-radius: 8px;
-  color: #666;
-  transition: background-color 0.2s;
+  border-radius: 6px;
+  color: #495057;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
 }
 
 .back-button:hover {
-  background-color: #f0f0f0;
+  background-color: #e9ecef;
+  border-color: #dee2e6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .booking-title {
   font-size: 24px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: #1a202c !important;
   margin: 0;
+  text-shadow: none;
+  background: transparent;
+}
+
+/* Ensure booking title is always dark */
+.booking-header .booking-title,
+h1.booking-title {
+  color: #1a202c !important;
 }
 
 /* Housekeeper Info Section */

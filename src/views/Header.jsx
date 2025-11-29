@@ -73,6 +73,17 @@ export default function Header({ keyword, setKeyword, onSearch }) {
           onKeyDown={e => { if (e.key === "Enter") onSearch(); }}
         />
         <button className="search-btn" onClick={onSearch}>{t.search}</button>
+        
+        {/* Quick Booking Button - Only show for authenticated customers */}
+        {isAuthenticated && user?.role === 'customer' && (
+          <button 
+            className="quick-booking-btn"
+            onClick={() => navigate("/quick-booking")}
+            title="Đặt dịch vụ nhanh - Hệ thống tự động tìm người giúp việc phù hợp"
+          >
+            ⚡ Đặt nhanh
+          </button>
+        )}
       </div>
       <div className="header-right">
         {isAuthenticated ? (

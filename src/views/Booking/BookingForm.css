@@ -5,11 +5,20 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.form-title {
+.booking-form-container .form-title {
   font-size: 20px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: #1a202c !important;
   margin: 0 0 24px 0;
+  text-shadow: none;
+  background: transparent;
+}
+
+/* Ensure title is always dark on any background */
+.form-title, 
+h2.form-title,
+.booking-form-container h2 {
+  color: #1a202c !important;
 }
 
 .booking-form {
@@ -181,6 +190,17 @@
 .submit-button:disabled {
   background-color: #ccc;
   cursor: not-allowed;
+}
+
+/* Discount styling */
+.price-item.discount {
+  color: #27ae60;
+  font-weight: 500;
+}
+
+.discount-amount {
+  color: #27ae60 !important;
+  font-weight: 600;
 }
 
 /* Responsive */

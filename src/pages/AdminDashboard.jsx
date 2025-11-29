@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminVerificationPanel from '../components/AdminVerificationPanel';
+import CouponManagement from '../components/Admin/CouponManagement';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -567,6 +568,13 @@ const AdminDashboard = () => {
             <span className="nav-icon">⚠️</span>
             Báo cáo vi phạm
           </button>
+          <button 
+            className={`nav-item ${activeSection === 'coupons' ? 'active' : ''}`}
+            onClick={() => setActiveSection('coupons')}
+          >
+            <span className="nav-icon">🎫</span>
+            Mã giảm giá
+          </button>
         </nav>
       </div>
 
@@ -583,6 +591,7 @@ const AdminDashboard = () => {
               {activeSection === 'reviews' && '⭐ Quản lý Đánh giá'}
               {activeSection === 'verification' && '🔐 Xác thực tài khoản'}
               {activeSection === 'reports' && '⚠️ Quản lý Báo cáo Vi phạm'}
+              {activeSection === 'coupons' && '🎫 Quản lý Mã giảm giá'}
             </h1>
             <p>Chào mừng trở lại! Đây là tổng quan hệ thống của bạn.</p>
           </div>
@@ -1532,6 +1541,13 @@ const AdminDashboard = () => {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Coupon Management Section */}
+        {activeSection === 'coupons' && (
+          <div className="coupons-content">
+            <CouponManagement />
           </div>
         )}
       </div>

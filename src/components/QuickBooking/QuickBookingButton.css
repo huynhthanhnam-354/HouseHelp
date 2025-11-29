@@ -1,0 +1,93 @@
+.quick-booking-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  text-align: left;
+  font-family: inherit;
+}
+
+.quick-booking-button:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+
+.quick-booking-button:active {
+  transform: translateY(0);
+}
+
+.quick-booking-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.quick-booking-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.quick-booking-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.quick-booking-subtitle {
+  font-size: 12px;
+  opacity: 0.9;
+  line-height: 1.3;
+}
+
+/* Compact version */
+.quick-booking-button.compact {
+  padding: 12px;
+  gap: 8px;
+}
+
+.quick-booking-button.compact .quick-booking-icon {
+  font-size: 20px;
+}
+
+.quick-booking-button.compact .quick-booking-title {
+  font-size: 14px;
+}
+
+.quick-booking-button.compact .quick-booking-subtitle {
+  font-size: 11px;
+}
+
+/* Small version for mobile */
+@media (max-width: 768px) {
+  .quick-booking-button {
+    padding: 12px;
+    gap: 10px;
+  }
+  
+  .quick-booking-icon {
+    font-size: 20px;
+  }
+  
+  .quick-booking-title {
+    font-size: 14px;
+  }
+  
+  .quick-booking-subtitle {
+    font-size: 11px;
+  }
+}

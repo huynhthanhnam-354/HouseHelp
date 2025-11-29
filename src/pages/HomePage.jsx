@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import FilterSidebar from "../components/Housekeeper/FilterSidebar";
 import HousekeeperList from "../components/Housekeeper/HousekeeperList";
-import QuickInfo from "../components/Housekeeper/QuickInfo";
-import SpecialOffer from "../components/Housekeeper/SpecialOffer";
+import QuickInfo from "../views/Housekeeper/QuickInfo";
+import SpecialOffer from "../views/Housekeeper/SpecialOffer";
 
 function Header() {
   // ... giữ nguyên ...
@@ -24,7 +24,7 @@ export default function HomePage() {
           <HousekeeperList filter={filter} />
         </main>
         <aside className="rightbar">
-          <QuickInfo />
+          <QuickInfo onFilterChange={setFilter} currentFilter={filter} />
           <SpecialOffer />
         </aside>
       </div>

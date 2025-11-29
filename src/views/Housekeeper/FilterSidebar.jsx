@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useAuth } from "../../hooks/useAuth";
 import translations from "../../locales/translations";
+import QuickBookingButton from "../../components/QuickBooking/QuickBookingButton";
 
 export default function FilterSidebar({ onFilterChange }) {
   const { language } = useLanguage();
+  const { isAuthenticated, user } = useAuth();
   const t = translations[language];
 
   const [services, setServices] = useState([]);
@@ -83,6 +86,13 @@ export default function FilterSidebar({ onFilterChange }) {
         </label>
       </div>
       <button className="btn clear-filters" onClick={handleClear}>{t.clearAllFilters || "Clear All Filters"}</button>
+      
+      {/* Quick Booking Button - Only show for authenticated customers */}
+      {isAuthenticated && user?.role === 'customer' && (
+        <div className="filter-section">
+          <QuickBookingButton />
+        </div>
+      )}
     </div>
   );
 }

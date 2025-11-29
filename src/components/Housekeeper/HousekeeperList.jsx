@@ -56,6 +56,7 @@ function buildQuery(filter) {
   if (filter.exactRating) params.push(`exactRating=${filter.exactRating}`);
   if (filter.maxPrice) params.push(`maxPrice=${filter.maxPrice}`);
   if (filter.available) params.push(`available=${filter.available}`);
+  if (filter.topRated) params.push(`topRated=true`);
   return params.length ? `?${params.join("&")}` : "";
 }
 

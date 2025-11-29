@@ -6,6 +6,81 @@ body, html {
   padding: 0;
 }
 
+/* Global text color fixes */
+.form-title, .booking-title {
+  color: #1a202c !important;
+}
+
+/* Coupon Management text fixes */
+.coupon-form label,
+.coupon-form input,
+.coupon-form select,
+.coupon-form textarea,
+.checkbox-label {
+  color: #2c3e50 !important;
+}
+
+.coupon-form input::placeholder,
+.coupon-form textarea::placeholder {
+  color: #95a5a6 !important;
+  opacity: 1 !important;
+}
+
+/* Force all coupon management text to be dark */
+.coupon-management,
+.coupon-management *,
+.coupons-table,
+.coupons-table *,
+.table-header,
+.table-header *,
+.table-row,
+.table-row * {
+  color: #2c3e50 !important;
+}
+
+/* Button fixes */
+.coupon-management .btn-primary {
+  background: #3498db !important;
+  color: white !important;
+  border: 1px solid #3498db !important;
+}
+
+.coupon-management .btn-primary:hover {
+  background: #2980b9 !important;
+  color: white !important;
+}
+
+.coupon-management .btn-secondary {
+  background: #95a5a6 !important;
+  color: white !important;
+  border: 1px solid #95a5a6 !important;
+}
+
+.coupon-management .btn-secondary:hover {
+  background: #7f8c8d !important;
+  color: white !important;
+}
+
+/* Form action buttons */
+.coupon-form .btn,
+.form-actions .btn {
+  color: white !important;
+}
+
+.coupon-form .btn-primary,
+.form-actions .btn-primary {
+  background: #3498db !important;
+  color: white !important;
+  border: 1px solid #3498db !important;
+}
+
+.coupon-form .btn-secondary,
+.form-actions .btn-secondary {
+  background: #95a5a6 !important;
+  color: white !important;
+  border: 1px solid #95a5a6 !important;
+}
+
 /* Profile page full screen reset */
 .profile-page-container {
   position: fixed !important;
@@ -702,6 +777,32 @@ body, html {
 .search-btn:hover {
   background: #1d4ed8;
 }
+
+/* Quick Booking Button */
+.quick-booking-btn {
+  padding: 10px 16px;
+  border: none;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-left: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+  white-space: nowrap;
+}
+
+.quick-booking-btn:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.quick-booking-btn:active {
+  transform: translateY(0);
+}
 .header-right {
   display: flex;
   gap: 12px;
@@ -1179,4 +1280,13 @@ body, html {
 .btn.clear-filters:hover {
   background: #033894;
   color: #fff;
+}
+
+/* Fix for booking titles being white/invisible */
+.form-title,
+.booking-title,
+.booking-form-container h2,
+.booking-header h1 {
+  color: #1a202c !important;
+  text-shadow: none !important;
 }

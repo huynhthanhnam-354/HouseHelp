@@ -124,9 +124,9 @@ export default function BookingDetailPage() {
       .slice(0, 2);
   };
 
-  const handleBookingSubmit = async (bookingData) => {
+  const handleBookingSubmit = async (bookingData, appliedCoupon = null) => {
     try {
-      await createBooking(bookingData);
+      await createBooking(bookingData, appliedCoupon);
     } catch (error) {
       console.error("Booking error:", error);
       // Error is handled in BookingContext

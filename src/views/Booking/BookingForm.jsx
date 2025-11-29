@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useAuth } from "../../hooks/useAuth";
 import translations from "../../locales/translations";
+import CouponInput from "../../components/Booking/CouponInput";
 import "./BookingForm.css";
 
 export default function BookingForm({ housekeeper, onSubmit, calculateTotalPrice }) {
@@ -19,6 +20,7 @@ export default function BookingForm({ housekeeper, onSubmit, calculateTotalPrice
   });
 
   const [errors, setErrors] = useState({});
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
 
   const timeSlots = [
     "08:00", "09:00", "10:00", "11:00", "12:00",
@@ -94,11 +96,16 @@ export default function BookingForm({ housekeeper, onSubmit, calculateTotalPrice
         housekeeperId: housekeeper?.id || ""
       };
       
-      onSubmit(bookingDataWithCustomer);
+      onSubmit(bookingDataWithCustomer, appliedCoupon);
     }
   };
 
-  const totalPrice = calculateTotalPrice(formData);
+  const basePrice = calculateTotalPrice(formData);
+  const totalPrice = appliedCoupon ? appliedCoupon.finalAmount : basePrice;
+
+  const handleCouponApplied = (couponData) => {
+    setAppliedCoupon(couponData);
+  };
 
   return (
     <div className="booking-form-container">
@@ -196,6 +203,12 @@ export default function BookingForm({ housekeeper, onSubmit, calculateTotalPrice
           />
         </div>
 
+        {/* Coupon Input */}
+        <CouponInput 
+          totalAmount={basePrice}
+          onCouponApplied={handleCouponApplied}
+        />
+
         {/* Price Breakdown */}
         <div className="price-breakdown">
           <h3>{t.priceBreakdown || "Price Breakdown"}</h3>
@@ -211,6 +224,14 @@ export default function BookingForm({ housekeeper, onSubmit, calculateTotalPrice
             <span>{t.serviceFee || "Service fee"}</span>
             <span>$5.00</span>
           </div>
+          
+          {appliedCoupon && (
+            <div className="price-item discount">
+              <span>🎫 {appliedCoupon.coupon.description}</span>
+              <span className="discount-amount">-${appliedCoupon.discountAmount.toFixed(2)}</span>
+            </div>
+          )}
+          
           <div className="price-total">
             <span>{t.total || "Total"}</span>
             <span>${totalPrice.toFixed(2)}</span>

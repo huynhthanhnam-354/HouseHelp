@@ -5,6 +5,8 @@ import HomePage from "./controllers/HomePageController";
 import ProfilePage from "./pages/ProfilePage";
 import BookingDetailPage from "./pages/BookingDetailPage";
 import BookingViewPage from "./pages/BookingViewPage";
+import QuickBookingPage from "./pages/QuickBookingPage";
+import BookingStatusPage from "./pages/BookingStatusPage";
 import HousekeeperDashboard from "./pages/HousekeeperDashboard";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -54,10 +56,13 @@ export default function App() {
               <Route path="/login" element={<AuthPage mode="login" />} />
               <Route path="/register" element={<AuthPage mode="register" />} />
               <Route path="/" element={<HomePageWrapper />} />
+              <Route path="/housekeepers" element={<HomePageWrapper />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/booking/:housekeeperId" element={<BookingDetailPage />} />
               <Route path="/booking-detail/:bookingId" element={<BookingDetailPage />} />
               <Route path="/booking-view/:bookingId" element={<BookingViewPage />} />
+              <Route path="/quick-booking" element={<QuickBookingPage />} />
+              <Route path="/booking-status" element={<BookingStatusPage />} />
               <Route path="/housekeeper/dashboard" element={<HousekeeperDashboard />} />
               <Route path="/customer/dashboard" element={<CustomerDashboard />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import FilterSidebar from "./Housekeeper/FilterSidebar";
 import HousekeeperList from "./Housekeeper/HousekeeperList";
 import QuickInfo from "./Housekeeper/QuickInfo";
@@ -52,6 +53,17 @@ export default function HomePageView() {
   const [filter, setFilter] = useState(null);
   const [keyword, setKeyword] = useState("");
   const { user, isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  // Đọc URL parameters khi component mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const filterParam = urlParams.get('filter');
+    
+    if (filterParam === 'top-rated') {
+      setFilter({ topRated: true });
+    }
+  }, [location.search]);
 
   // Xử lý sự kiện tìm kiếm
   const handleSearch = () => {
@@ -114,7 +126,7 @@ export default function HomePageView() {
           <HousekeeperList filter={filter} />
         </main>
         <aside className="rightbar">
-          <QuickInfo />
+          <QuickInfo onFilterChange={setFilter} currentFilter={filter} />
           <SpecialOffer />
         </aside>
       </div>

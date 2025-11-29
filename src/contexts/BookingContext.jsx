@@ -193,7 +193,7 @@ export const BookingProvider = ({ children }) => {
   };
 
   // Create booking
-  const createBooking = async (bookingData) => {
+  const createBooking = async (bookingData, appliedCoupon = null) => {
     try {
       setError(null);
 
@@ -216,7 +216,12 @@ export const BookingProvider = ({ children }) => {
       
       // Call real API để tạo booking
       try {
-        const response = await fetch('http://localhost:5000/api/bookings', {
+        // Determine API endpoint based on booking type
+        const apiEndpoint = bookingData.isQuickBooking 
+          ? 'http://localhost:5000/api/quick-booking/create'
+          : 'http://localhost:5000/api/bookings';
+
+        const response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -234,7 +239,10 @@ export const BookingProvider = ({ children }) => {
             customerName: bookingData.customerName,
             customerEmail: bookingData.customerEmail,
             customerPhone: bookingData.customerPhone,
-            housekeeperName: state.selectedHousekeeper?.fullName
+            housekeeperName: state.selectedHousekeeper?.fullName,
+            // Quick booking specific fields
+            urgency: bookingData.urgency || 'normal',
+            isQuickBooking: bookingData.isQuickBooking || false
           })
         });
 
@@ -305,6 +313,56 @@ export const BookingProvider = ({ children }) => {
     return bookingHistory.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   };
 
+  // Quick Booking: Find matching housekeepers
+  const findMatchingHousekeepers = async (searchCriteria) => {
+    try {
+      setError(null);
+      
+      const response = await fetch('http://localhost:5000/api/quick-booking/find-matches', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(searchCriteria)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to find matching housekeepers');
+      }
+
+      const result = await response.json();
+      return result.matches || [];
+      
+    } catch (error) {
+      setError(error.message || 'Failed to find matching housekeepers');
+      throw error;
+    }
+  };
+
+  // Quick Booking: Create booking with auto-selected housekeeper
+  const createQuickBooking = async (bookingData, selectedHousekeeper) => {
+    try {
+      setError(null);
+
+      // Set the selected housekeeper
+      setHousekeeper(selectedHousekeeper);
+
+      // Create booking with quick booking flag
+      const quickBookingData = {
+        ...bookingData,
+        isQuickBooking: true,
+        housekeeperId: selectedHousekeeper.id,
+        housekeeperName: selectedHousekeeper.fullName
+      };
+
+      return await createBooking(quickBookingData);
+      
+    } catch (error) {
+      setError(error.message || 'Failed to create quick booking');
+      throw error;
+    }
+  };
+
   const value = {
     // State
     ...state,
@@ -326,7 +384,11 @@ export const BookingProvider = ({ children }) => {
     createBooking,
     cancelBooking,
     getBookingById,
-    getUserBookings
+    getUserBookings,
+    
+    // Quick Booking Methods
+    findMatchingHousekeepers,
+    createQuickBooking
   };
 
   return (

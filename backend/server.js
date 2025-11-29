@@ -122,7 +122,7 @@ const chatbotService = new ChatbotService();
 
 // API: Lấy tất cả housekeepers (filter dịch vụ theo bảng housekeeper_services, OR logic)
 app.get('/api/housekeepers', (req, res) => {
-  const { services, exactRating, maxPrice, available } = req.query;
+  const { services, exactRating, maxPrice, available, topRated } = req.query;
   
   // Nếu có filter services, trước tiên cần chuyển tên service thành serviceId
   if (services) {
@@ -183,6 +183,7 @@ app.get('/api/housekeepers', (req, res) => {
       sql += ` AND ` + where.join(" AND ");
     }
     sql += ` GROUP BY h.id, h.userId, h.services, h.price, h.available, h.description, u.fullName, u.email, u.phone`;
+    
     // BỎ HAVING COUNT(DISTINCT hs.serviceId) = ... để filter OR
     if (exactRating) {
       // Lọc theo rating chính xác (ví dụ: 4 sao = 4.0-4.9)
@@ -190,8 +191,21 @@ app.get('/api/housekeepers', (req, res) => {
       params.push(Number(exactRating));
       params.push(Number(exactRating) + 1);
     }
+    
+    // Filter top-rated (rating >= 4.5 và có ít nhất 10 reviews)
+    if (topRated === 'true') {
+      having.push(`AVG(r.rating) >= 4.5 AND COUNT(r.id) >= 5`);
+    }
+    
     if (having.length) {
       sql += ` HAVING ` + having.join(" AND ");
+    }
+    
+    // Sắp xếp: Top-rated theo rating cao nhất, còn lại theo thứ tự bình thường
+    if (topRated === 'true') {
+      sql += ` ORDER BY AVG(r.rating) DESC, COUNT(r.id) DESC`;
+    } else {
+      sql += ` ORDER BY h.isTopRated DESC, AVG(r.rating) DESC`;
     }
 
     
@@ -1693,7 +1707,234 @@ app.get('/api/bookings', (req, res) => {
   });
 });
 
-// API: Đặt lịch
+// API: Quick Booking - Tìm housekeeper phù hợp
+app.post('/api/quick-booking/find-matches', (req, res) => {
+  const { 
+    service, 
+    date, 
+    time, 
+    duration, 
+    location, 
+    maxPrice, 
+    urgency,
+    customerId 
+  } = req.body;
+
+  console.log('🔍 Quick booking search request:', {
+    service, date, time, duration, location, maxPrice, urgency, customerId
+  });
+
+  // Build query to find matching housekeepers
+  let sql = `
+    SELECT h.*, u.fullName, u.email, u.phone, u.isVerified, u.isApproved,
+           COALESCE(AVG(r.rating), 4.0) as avgRating,
+           COUNT(r.id) as reviewCount,
+           GROUP_CONCAT(s.name) as services
+    FROM housekeepers h
+    JOIN users u ON h.userId = u.id
+    LEFT JOIN reviews r ON h.id = r.housekeeperId
+    LEFT JOIN housekeeper_services hs ON h.id = hs.housekeeperId
+    LEFT JOIN services s ON hs.serviceId = s.id
+    WHERE u.isApproved = 1 AND u.isVerified = 1
+      AND h.price <= ?
+  `;
+
+  const params = [maxPrice];
+
+  // Add service filter if specified
+  if (service) {
+    sql += ` AND s.name LIKE ?`;
+    params.push(`%${service}%`);
+  }
+
+  sql += `
+    GROUP BY h.id, u.id
+    HAVING avgRating >= 3.0
+    ORDER BY 
+      CASE 
+        WHEN ? = 'asap' THEN (avgRating * 0.3 + (5 - h.price/20) * 0.4 + reviewCount/10 * 0.3)
+        WHEN ? = 'urgent' THEN (avgRating * 0.4 + (5 - h.price/20) * 0.3 + reviewCount/10 * 0.3)
+        ELSE (avgRating * 0.5 + (5 - h.price/20) * 0.2 + reviewCount/10 * 0.3)
+      END DESC
+    LIMIT 10
+  `;
+
+  params.push(urgency, urgency);
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error('Error finding matching housekeepers:', err);
+      return res.status(500).json({ error: 'Failed to find matches' });
+    }
+
+    console.log(`✅ Found ${results.length} matching housekeepers`);
+    
+    // Calculate match scores and format results
+    const matchedHousekeepers = results.map((hk, index) => {
+      let matchScore = 85 - (index * 5); // Base score decreasing by rank
+      
+      // Adjust score based on criteria
+      if (hk.avgRating >= 4.5) matchScore += 10;
+      if (hk.reviewCount >= 10) matchScore += 5;
+      if (hk.backgroundChecked) matchScore += 5;
+      if (hk.insured) matchScore += 5;
+      
+      // Price bonus (lower price = higher score within budget)
+      const priceRatio = hk.price / maxPrice;
+      if (priceRatio <= 0.7) matchScore += 10;
+      else if (priceRatio <= 0.9) matchScore += 5;
+
+      return {
+        ...hk,
+        matchScore: Math.min(100, Math.max(60, matchScore)),
+        services: hk.services ? hk.services.split(',') : []
+      };
+    });
+
+    res.json({
+      success: true,
+      matches: matchedHousekeepers,
+      searchCriteria: {
+        service, date, time, duration, location, maxPrice, urgency
+      }
+    });
+  });
+});
+
+// API: Quick Booking - Tạo booking nhanh
+app.post('/api/quick-booking/create', (req, res) => {
+  const { 
+    customerId,
+    housekeeperId,
+    service,
+    date,
+    time,
+    duration,
+    location,
+    notes,
+    totalPrice,
+    customerName,
+    customerEmail,
+    customerPhone,
+    housekeeperName,
+    urgency,
+    isQuickBooking = true
+  } = req.body;
+
+  console.log('⚡ Creating quick booking:', {
+    customerId, housekeeperId, service, date, time, urgency
+  });
+
+  const bookingData = {
+    customerId,
+    housekeeperId,
+    service,
+    date,
+    time,
+    duration,
+    location,
+    notes,
+    status: 'pending',
+    totalPrice,
+    customerName,
+    customerEmail,
+    customerPhone,
+    housekeeperName,
+    urgency,
+    isQuickBooking,
+    createdAt: new Date()
+  };
+
+  const sql = `INSERT INTO bookings 
+    (customerId, housekeeperId, service, startDate, time, duration, location, notes, status, totalPrice, customerName, customerEmail, customerPhone, housekeeperName, urgency, isQuickBooking, createdAt) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    
+  const values = [
+    customerId, housekeeperId, service, date, time, duration, location, notes, 
+    'pending', totalPrice, customerName, customerEmail, customerPhone, housekeeperName, urgency, isQuickBooking, new Date()
+  ];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Error creating quick booking:', err);
+      return res.status(500).json({ error: err });
+    }
+
+    const bookingId = result.insertId;
+    const newBooking = { ...bookingData, id: bookingId };
+
+    console.log('⚡ QUICK BOOKING CREATED:');
+    console.log('- Booking ID:', bookingId);
+    console.log('- Customer ID:', customerId);
+    console.log('- Housekeeper ID:', housekeeperId);
+    console.log('- Urgency:', urgency);
+    console.log('- Service:', service);
+
+    // Send urgent notification to housekeeper for quick bookings
+    const notificationTitle = urgency === 'asap' 
+      ? '🚨 Đơn đặt lịch KHẨN CẤP!' 
+      : urgency === 'urgent' 
+        ? '⚡ Đơn đặt lịch GẤP!'
+        : '📋 Đơn đặt lịch nhanh mới';
+
+    const notificationMessage = urgency === 'asap'
+      ? `${customerName} cần dịch vụ ${service} NGAY LẬP TỨC!`
+      : urgency === 'urgent'
+        ? `${customerName} cần dịch vụ ${service} trong 6h tới`
+        : `${customerName} đã đặt lịch dịch vụ ${service} (Đặt nhanh)`;
+
+    const notificationToHousekeeper = {
+      id: Date.now(),
+      type: 'quick_booking',
+      title: notificationTitle,
+      message: notificationMessage,
+      bookingId: bookingId,
+      booking: newBooking,
+      urgency: urgency,
+      timestamp: new Date(),
+      read: false
+    };
+
+    // Get housekeeper's userId and send notification
+    db.query('SELECT userId FROM housekeepers WHERE id = ?', [housekeeperId], (err, housekeeperResults) => {
+      if (err || housekeeperResults.length === 0) {
+        console.error('Error finding housekeeper userId:', err);
+        return res.json({ success: true, booking: newBooking, id: bookingId });
+      }
+
+      const housekeeperUserId = housekeeperResults[0].userId;
+      console.log('📤 Sending quick booking notification to housekeeper userId:', housekeeperUserId);
+
+      // Store notification in database
+      const notificationSql = `INSERT INTO notifications 
+        (userId, type, title, message, bookingId, urgency, createdAt, isRead) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+      
+      const notificationValues = [
+        housekeeperUserId, 'quick_booking', notificationTitle, notificationMessage, 
+        bookingId, urgency, new Date(), false
+      ];
+
+      db.query(notificationSql, notificationValues, (err) => {
+        if (err) {
+          console.error('Error saving notification:', err);
+        } else {
+          console.log('✅ Quick booking notification saved to database');
+        }
+
+        // Send real-time notification via WebSocket
+        if (io) {
+          io.emit(`notification_${housekeeperUserId}`, notificationToHousekeeper);
+          console.log('📡 Quick booking notification sent via WebSocket');
+        }
+
+        res.json({ success: true, booking: newBooking, id: bookingId });
+      });
+    });
+  });
+});
+
+// API: Đặt lịch (Regular booking)
 app.post('/api/bookings', (req, res) => {
   const { 
     customerId, 
@@ -4539,6 +4780,412 @@ app.get('/api/complaints/:ticketId', (req, res) => {
     console.error('Fetch complaint details error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// ========================
+// COUPON/DISCOUNT APIs
+// ========================
+
+// API: Kiểm tra mã giảm giá
+app.post('/api/coupons/validate', (req, res) => {
+  const { code, customerId, totalAmount } = req.body;
+  
+  console.log('🎫 Validating coupon:', { code, customerId, totalAmount });
+  
+  // Tìm coupon trong database
+  const findCouponSql = `
+    SELECT * FROM coupons 
+    WHERE code = ? AND isActive = TRUE 
+    AND (expiresAt IS NULL OR expiresAt > NOW())
+  `;
+  
+  db.query(findCouponSql, [code.toUpperCase()], (err, couponResults) => {
+    if (err) {
+      console.error('Error finding coupon:', err);
+      return res.status(500).json({ valid: false, message: 'Lỗi hệ thống' });
+    }
+    
+    if (couponResults.length === 0) {
+      return res.status(400).json({
+        valid: false,
+        message: 'Mã giảm giá không tồn tại hoặc đã hết hạn'
+      });
+    }
+    
+    const coupon = couponResults[0];
+    
+    // Kiểm tra số tiền tối thiểu
+    if (totalAmount < coupon.minAmount) {
+      return res.status(400).json({
+        valid: false,
+        message: `Đơn hàng tối thiểu $${coupon.minAmount} để sử dụng mã này`
+      });
+    }
+    
+    // Kiểm tra usage limit
+    if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
+      return res.status(400).json({
+        valid: false,
+        message: 'Mã giảm giá đã hết lượt sử dụng'
+      });
+    }
+    
+    // Kiểm tra nếu user đã sử dụng mã này (cho mã firstTimeOnly)
+    if (customerId) {
+      const checkUsageSql = `
+        SELECT COUNT(*) as usageCount 
+        FROM coupon_usage 
+        WHERE couponId = ? AND userId = ?
+      `;
+      
+      db.query(checkUsageSql, [coupon.id, customerId], (err, usageResults) => {
+        if (err) {
+          console.error('Error checking coupon usage:', err);
+          return res.status(500).json({ valid: false, message: 'Lỗi hệ thống' });
+        }
+        
+        const usageCount = usageResults[0].usageCount;
+        
+        if (coupon.firstTimeOnly && usageCount > 0) {
+          return res.status(400).json({
+            valid: false,
+            message: 'Bạn đã sử dụng mã giảm giá này rồi'
+          });
+        }
+        
+        // Kiểm tra nếu là mã dành cho lần đầu
+        if (coupon.firstTimeOnly) {
+          const checkFirstTimeSql = `
+            SELECT COUNT(*) as bookingCount 
+            FROM bookings 
+            WHERE customerId = ? AND status IN ('completed', 'confirmed')
+          `;
+          
+          db.query(checkFirstTimeSql, [customerId], (err, bookingResults) => {
+            if (err) {
+              console.error('Error checking first time customer:', err);
+              return res.status(500).json({ valid: false, message: 'Lỗi hệ thống' });
+            }
+            
+            const bookingCount = bookingResults[0].bookingCount;
+            
+            if (bookingCount > 0) {
+              return res.status(400).json({
+                valid: false,
+                message: 'Mã giảm giá chỉ dành cho khách hàng mới'
+              });
+            }
+            
+            // Tính toán giảm giá
+            calculateDiscount();
+          });
+        } else {
+          calculateDiscount();
+        }
+      });
+    } else {
+      calculateDiscount();
+    }
+    
+    function calculateDiscount() {
+      let discountAmount = 0;
+      
+      if (coupon.type === 'percentage') {
+        discountAmount = (Number(totalAmount) * Number(coupon.discount)) / 100;
+        if (coupon.maxDiscount > 0 && discountAmount > Number(coupon.maxDiscount)) {
+          discountAmount = Number(coupon.maxDiscount);
+        }
+      } else {
+        discountAmount = Number(coupon.discount);
+      }
+      
+      // Ensure discountAmount is a valid number
+      discountAmount = Number(discountAmount) || 0;
+      const finalAmount = Number(totalAmount) - discountAmount;
+      
+      res.json({
+        valid: true,
+        coupon: {
+          id: coupon.id,
+          code: coupon.code,
+          description: coupon.description,
+          discount: coupon.discount,
+          type: coupon.type
+        },
+        discountAmount: Math.round(discountAmount * 100) / 100,
+        finalAmount: Math.round(finalAmount * 100) / 100,
+        message: `Áp dụng thành công! Giảm $${discountAmount.toFixed(2)}`
+      });
+    }
+  });
+});
+
+// ========================
+// ADMIN COUPON MANAGEMENT APIs
+// ========================
+
+// API: Lấy tất cả coupons (Admin only)
+app.get('/api/admin/coupons', (req, res) => {
+  const sql = `
+    SELECT * FROM coupons 
+    ORDER BY createdAt DESC
+  `;
+  
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Error fetching coupons:', err);
+      return res.status(500).json({ error: 'Lỗi lấy danh sách mã giảm giá' });
+    }
+    
+    res.json(results);
+  });
+});
+
+// API: Tạo coupon mới (Admin only)
+app.post('/api/admin/coupons', (req, res) => {
+  const {
+    code, description, discount, type, minAmount, maxDiscount,
+    firstTimeOnly, isActive, usageLimit, expiresAt
+  } = req.body;
+  
+  console.log('🎫 Creating new coupon:', { code, description, discount, type });
+  
+  // Validate required fields
+  if (!code || !description || !discount || !type) {
+    return res.status(400).json({ 
+      error: 'Thiếu thông tin bắt buộc',
+      message: 'Mã, mô tả, giá trị giảm và loại giảm giá là bắt buộc'
+    });
+  }
+  
+  // Check if code already exists
+  const checkCodeSql = 'SELECT id FROM coupons WHERE code = ?';
+  
+  db.query(checkCodeSql, [code.toUpperCase()], (err, existing) => {
+    if (err) {
+      console.error('Error checking coupon code:', err);
+      return res.status(500).json({ error: 'Lỗi kiểm tra mã giảm giá' });
+    }
+    
+    if (existing.length > 0) {
+      return res.status(400).json({ 
+        error: 'Mã giảm giá đã tồn tại',
+        message: 'Vui lòng chọn mã khác'
+      });
+    }
+    
+    // Insert new coupon
+    const insertSql = `
+      INSERT INTO coupons (
+        code, description, discount, type, minAmount, maxDiscount,
+        firstTimeOnly, isActive, usageLimit, expiresAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const values = [
+      code.toUpperCase(),
+      description,
+      Number(discount),
+      type,
+      minAmount ? Number(minAmount) : 0,
+      maxDiscount ? Number(maxDiscount) : 0,
+      Boolean(firstTimeOnly),
+      Boolean(isActive),
+      usageLimit ? Number(usageLimit) : null,
+      expiresAt || null
+    ];
+    
+    db.query(insertSql, values, (err, result) => {
+      if (err) {
+        console.error('Error creating coupon:', err);
+        return res.status(500).json({ error: 'Lỗi tạo mã giảm giá' });
+      }
+      
+      console.log('✅ Coupon created successfully:', result.insertId);
+      
+      res.status(201).json({
+        success: true,
+        message: 'Tạo mã giảm giá thành công',
+        couponId: result.insertId
+      });
+    });
+  });
+});
+
+// API: Cập nhật coupon (Admin only)
+app.put('/api/admin/coupons/:id', (req, res) => {
+  const couponId = req.params.id;
+  const {
+    code, description, discount, type, minAmount, maxDiscount,
+    firstTimeOnly, isActive, usageLimit, expiresAt
+  } = req.body;
+  
+  console.log('🎫 Updating coupon:', couponId);
+  
+  // Check if coupon exists
+  const checkSql = 'SELECT id FROM coupons WHERE id = ?';
+  
+  db.query(checkSql, [couponId], (err, existing) => {
+    if (err) {
+      console.error('Error checking coupon:', err);
+      return res.status(500).json({ error: 'Lỗi kiểm tra mã giảm giá' });
+    }
+    
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy mã giảm giá' });
+    }
+    
+    // Check if code is unique (exclude current coupon)
+    const checkCodeSql = 'SELECT id FROM coupons WHERE code = ? AND id != ?';
+    
+    db.query(checkCodeSql, [code.toUpperCase(), couponId], (err, duplicate) => {
+      if (err) {
+        console.error('Error checking duplicate code:', err);
+        return res.status(500).json({ error: 'Lỗi kiểm tra mã giảm giá' });
+      }
+      
+      if (duplicate.length > 0) {
+        return res.status(400).json({ 
+          error: 'Mã giảm giá đã tồn tại',
+          message: 'Vui lòng chọn mã khác'
+        });
+      }
+      
+      // Update coupon
+      const updateSql = `
+        UPDATE coupons SET 
+          code = ?, description = ?, discount = ?, type = ?, 
+          minAmount = ?, maxDiscount = ?, firstTimeOnly = ?, 
+          isActive = ?, usageLimit = ?, expiresAt = ?,
+          updatedAt = NOW()
+        WHERE id = ?
+      `;
+      
+      const values = [
+        code.toUpperCase(),
+        description,
+        Number(discount),
+        type,
+        minAmount ? Number(minAmount) : 0,
+        maxDiscount ? Number(maxDiscount) : 0,
+        Boolean(firstTimeOnly),
+        Boolean(isActive),
+        usageLimit ? Number(usageLimit) : null,
+        expiresAt || null,
+        couponId
+      ];
+      
+      db.query(updateSql, values, (err, result) => {
+        if (err) {
+          console.error('Error updating coupon:', err);
+          return res.status(500).json({ error: 'Lỗi cập nhật mã giảm giá' });
+        }
+        
+        console.log('✅ Coupon updated successfully:', couponId);
+        
+        res.json({
+          success: true,
+          message: 'Cập nhật mã giảm giá thành công'
+        });
+      });
+    });
+  });
+});
+
+// API: Xóa coupon (Admin only)
+app.delete('/api/admin/coupons/:id', (req, res) => {
+  const couponId = req.params.id;
+  
+  console.log('🗑️ Deleting coupon:', couponId);
+  
+  // Check if coupon has been used
+  const checkUsageSql = 'SELECT COUNT(*) as usageCount FROM coupon_usage WHERE couponId = ?';
+  
+  db.query(checkUsageSql, [couponId], (err, usage) => {
+    if (err) {
+      console.error('Error checking coupon usage:', err);
+      return res.status(500).json({ error: 'Lỗi kiểm tra sử dụng mã giảm giá' });
+    }
+    
+    const usageCount = usage[0].usageCount;
+    
+    if (usageCount > 0) {
+      // If coupon has been used, just deactivate it instead of deleting
+      const deactivateSql = 'UPDATE coupons SET isActive = FALSE, updatedAt = NOW() WHERE id = ?';
+      
+      db.query(deactivateSql, [couponId], (err, result) => {
+        if (err) {
+          console.error('Error deactivating coupon:', err);
+          return res.status(500).json({ error: 'Lỗi vô hiệu hóa mã giảm giá' });
+        }
+        
+        res.json({
+          success: true,
+          message: 'Mã giảm giá đã được vô hiệu hóa (do đã có người sử dụng)'
+        });
+      });
+    } else {
+      // If coupon hasn't been used, delete it completely
+      const deleteSql = 'DELETE FROM coupons WHERE id = ?';
+      
+      db.query(deleteSql, [couponId], (err, result) => {
+        if (err) {
+          console.error('Error deleting coupon:', err);
+          return res.status(500).json({ error: 'Lỗi xóa mã giảm giá' });
+        }
+        
+        if (result.affectedRows === 0) {
+          return res.status(404).json({ error: 'Không tìm thấy mã giảm giá' });
+        }
+        
+        console.log('✅ Coupon deleted successfully:', couponId);
+        
+        res.json({
+          success: true,
+          message: 'Xóa mã giảm giá thành công'
+        });
+      });
+    }
+  });
+});
+
+// API: Lưu coupon usage khi booking thành công
+app.post('/api/coupons/use', (req, res) => {
+  const { couponId, userId, bookingId, discountAmount } = req.body;
+  
+  console.log('💰 Recording coupon usage:', { couponId, userId, bookingId, discountAmount });
+  
+  // Lưu coupon usage
+  const insertUsageSql = `
+    INSERT INTO coupon_usage (couponId, userId, bookingId, discountAmount) 
+    VALUES (?, ?, ?, ?)
+  `;
+  
+  db.query(insertUsageSql, [couponId, userId, bookingId, discountAmount], (err, result) => {
+    if (err) {
+      console.error('Error recording coupon usage:', err);
+      return res.status(500).json({ error: 'Lỗi lưu thông tin sử dụng coupon' });
+    }
+    
+    // Cập nhật usedCount trong bảng coupons
+    const updateCountSql = `
+      UPDATE coupons 
+      SET usedCount = usedCount + 1, updatedAt = NOW() 
+      WHERE id = ?
+    `;
+    
+    db.query(updateCountSql, [couponId], (err) => {
+      if (err) {
+        console.error('Error updating coupon count:', err);
+      }
+    });
+    
+    res.json({
+      success: true,
+      message: 'Đã ghi nhận sử dụng mã giảm giá',
+      usageId: result.insertId
+    });
+  });
 });
 
 server.listen(5000, () => console.log('Server running on port 5000 with WebSocket support'));
