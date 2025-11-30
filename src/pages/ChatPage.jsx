@@ -84,9 +84,11 @@ const ChatPage = () => {
                 </div>
               </div>
               <div className="chat-window-wrapper">
+                {console.log('🔍 ChatPage passing selectedConversation:', selectedConversation)}
+                {console.log('🔍 selectedConversation.otherUserId:', selectedConversation?.otherUserId)}
                 <ChatWindow
                   bookingId={selectedConversation.bookingId}
-                  otherUser={selectedConversation.otherUser}
+                  otherUser={selectedConversation}
                   onClose={handleCloseChat}
                 />
               </div>

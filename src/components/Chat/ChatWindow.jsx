@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import io from 'socket.io-client';
+import CallButton from '../Call/CallButton';
+import CallWindow from '../Call/CallWindow';
+import CallService from '../../services/CallService';
 import './ChatWindow.css';
 
 const ChatWindow = ({ bookingId, otherUser, onClose }) => {
@@ -9,6 +12,9 @@ const ChatWindow = ({ bookingId, otherUser, onClose }) => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showCallWindow, setShowCallWindow] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [callData, setCallData] = useState(null);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
@@ -65,6 +71,12 @@ const ChatWindow = ({ bookingId, otherUser, onClose }) => {
       userId: user.id, 
       role: user.role 
     });
+
+    // Initialize CallService
+    const userName = user.fullName || `${user.firstName} ${user.lastName}` || 'Người dùng';
+    CallService.connect(user.id, user.role, userName);
+    
+    console.log('🔌 Initialized CallService for user:', user.id, userName);
     
     socketRef.current.on('connect', () => {
       console.log('✅ WebSocket connected');
@@ -265,10 +277,204 @@ const ChatWindow = ({ bookingId, otherUser, onClose }) => {
     return groups;
   };
 
+  // Call handlers
+  const handleVoiceCall = async () => {
+    try {
+      console.log('🔥 Starting voice call to:', otherUser);
+      console.log('🔍 otherUser.otherUserId:', otherUser?.otherUserId);
+      console.log('🔍 otherUser.otherUserName:', otherUser?.otherUserName);
+      console.log('🔍 otherUser keys available:', Object.keys(otherUser || {}));
+      console.log('🔍 otherUser.id:', otherUser?.id);
+      console.log('🔍 otherUser.customerId:', otherUser?.customerId);
+      console.log('🔍 otherUser.housekeeperId:', otherUser?.housekeeperId);
+      
+      // Extract userId - có thể là nested object
+      let targetUserId = null;
+      let targetUserName = 'Người dùng';
+      
+      if (typeof otherUser === 'object' && otherUser !== null) {
+        // Nếu otherUser có nested otherUser object (từ conversation)
+        const actualUser = otherUser.otherUser || otherUser;
+        
+        // Thử các cách khác nhau để lấy userId
+        targetUserId = actualUser.otherUserId || actualUser.id || actualUser.userId || otherUser.otherUserId || otherUser.housekeeperId || otherUser.customerId;
+        targetUserName = actualUser.otherUserName || actualUser.fullName || actualUser.name || otherUser.otherUserName || otherUser.housekeeperName || otherUser.customerName;
+        
+        // Nếu không có userId, thử extract từ các field khác
+        if (!targetUserId) {
+          // Thử lấy từ customerId hoặc housekeeperId
+          if (otherUser.customerId && otherUser.customerId !== user?.id) {
+            targetUserId = otherUser.customerId;
+            targetUserName = otherUser.customerName || 'Customer';
+          } else if (otherUser.housekeeperId && otherUser.housekeeperId !== user?.id) {
+            targetUserId = otherUser.housekeeperId;
+            targetUserName = otherUser.housekeeperName || 'Housekeeper';
+          } else if (otherUser.bookingId) {
+            console.log('⚠️ No userId found, using bookingId as fallback:', otherUser.bookingId);
+            targetUserId = `booking_${otherUser.bookingId}`; // Temporary ID
+            targetUserName = `User from Booking ${otherUser.bookingId}`;
+          }
+        }
+        
+        // Nếu vẫn là object, thử deep access
+        if (typeof targetUserId === 'object') {
+          console.log('🔍 targetUserId is object:', targetUserId);
+          targetUserId = targetUserId?.id || targetUserId?.otherUserId || targetUserId?.userId;
+        }
+        if (typeof targetUserName === 'object') {
+          console.log('🔍 targetUserName is object:', targetUserName);
+          targetUserName = targetUserName?.fullName || targetUserName?.name || 'Người dùng';
+        }
+      } else {
+        targetUserId = otherUser;
+      }
+      
+      console.log('🎯 Final targetUserId:', targetUserId, typeof targetUserId);
+      console.log('🎯 Final targetUserName:', targetUserName);
+      
+      if (!targetUserId) {
+        console.error('❌ Cannot extract targetUserId from:', otherUser);
+        console.error('❌ Available keys:', Object.keys(otherUser || {}));
+        console.error('❌ Available values:', Object.values(otherUser || {}));
+        throw new Error('Invalid user data - missing user ID');
+      }
+      
+      await CallService.startCall(targetUserId, false);
+      setCallData({
+        targetUserId: targetUserId,
+        targetUserName: targetUserName,
+        isVideoCall: false
+      });
+      setShowCallWindow(true);
+    } catch (error) {
+      console.error('Error starting voice call:', error);
+      alert(`Không thể bắt đầu cuộc gọi: ${error.message}`);
+    }
+  };
+
+  const handleVideoCall = async () => {
+    try {
+      console.log('🔥 Starting video call to:', otherUser);
+      
+      // Extract userId - có thể là nested object
+      let targetUserId = null;
+      let targetUserName = 'Người dùng';
+      
+      if (typeof otherUser === 'object' && otherUser !== null) {
+        // Nếu otherUser có nested otherUser object (từ conversation)
+        const actualUser = otherUser.otherUser || otherUser;
+        
+        targetUserId = actualUser.otherUserId || actualUser.id || actualUser.userId || otherUser.otherUserId || otherUser.housekeeperId || otherUser.customerId;
+        targetUserName = actualUser.otherUserName || actualUser.fullName || actualUser.name || otherUser.otherUserName || otherUser.housekeeperName || otherUser.customerName;
+        
+        // Fallback với customerId/housekeeperId
+        if (!targetUserId) {
+          if (otherUser.customerId && otherUser.customerId !== user?.id) {
+            targetUserId = otherUser.customerId;
+            targetUserName = otherUser.customerName || 'Customer';
+          } else if (otherUser.housekeeperId && otherUser.housekeeperId !== user?.id) {
+            targetUserId = otherUser.housekeeperId;
+            targetUserName = otherUser.housekeeperName || 'Housekeeper';
+          } else if (otherUser.bookingId) {
+            targetUserId = `booking_${otherUser.bookingId}`;
+            targetUserName = `User from Booking ${otherUser.bookingId}`;
+          }
+        }
+        
+        if (typeof targetUserId === 'object') {
+          targetUserId = targetUserId?.id || targetUserId?.otherUserId || targetUserId?.userId;
+        }
+        if (typeof targetUserName === 'object') {
+          targetUserName = targetUserName?.fullName || targetUserName?.name || 'Người dùng';
+        }
+      } else {
+        targetUserId = otherUser;
+      }
+      
+      if (!targetUserId) {
+        console.error('❌ Cannot extract targetUserId from:', otherUser);
+        throw new Error('Invalid user data - missing user ID');
+      }
+      
+      await CallService.startCall(targetUserId, true);
+      setCallData({
+        targetUserId: targetUserId,
+        targetUserName: targetUserName,
+        isVideoCall: true
+      });
+      setShowCallWindow(true);
+    } catch (error) {
+      console.error('Error starting video call:', error);
+      alert(`Không thể bắt đầu cuộc gọi video: ${error.message}`);
+    }
+  };
+
+  const handleAnswerCall = async (callData) => {
+    try {
+      await CallService.answerCall(callData);
+      setIncomingCall(null);
+    } catch (error) {
+      console.error('Error answering call:', error);
+      alert('Không thể trả lời cuộc gọi. Vui lòng thử lại.');
+    }
+  };
+
+  const handleRejectCall = () => {
+    if (incomingCall) {
+      CallService.rejectCall(incomingCall.callerId);
+      setIncomingCall(null);
+    }
+  };
+
+  const handleCloseCallWindow = () => {
+    setShowCallWindow(false);
+    setCallData(null);
+    setIncomingCall(null);
+  };
+
+  // Listen for incoming calls
+  useEffect(() => {
+    const handleCallEvent = (event, data) => {
+      console.log('🎧 ChatWindow received call event:', event, data);
+      if (event === 'incoming_call') {
+        console.log('📞 Setting up incoming call popup:', data);
+        setIncomingCall(data);
+        setCallData(data);
+        setShowCallWindow(true);
+      }
+    };
+
+    CallService.addListener(handleCallEvent);
+
+    return () => {
+      CallService.removeListener(handleCallEvent);
+    };
+  }, []);
+
   const messageGroups = groupMessagesByDate(messages);
 
   return (
     <div className="chat-window">
+      {/* Chat Header */}
+      <div className="chat-header">
+        <div className="chat-user-info">
+          <div className="user-avatar">
+            {((otherUser?.otherUser?.fullName || otherUser?.otherUserName || otherUser?.fullName)?.[0]) || 'U'}
+          </div>
+          <div className="user-details">
+            <h3>{otherUser?.otherUser?.fullName || otherUser?.otherUserName || otherUser?.fullName || 'Người dùng'}</h3>
+            <span className="user-status">Đang hoạt động</span>
+          </div>
+        </div>
+        <div className="chat-actions">
+          <CallButton 
+            onVoiceCall={handleVoiceCall}
+            onVideoCall={handleVideoCall}
+            otherUser={otherUser}
+          />
+          <button className="close-chat-btn" onClick={onClose}>×</button>
+        </div>
+      </div>
       <div 
         className="chat-messages"
         tabIndex={0}
@@ -346,6 +552,16 @@ const ChatWindow = ({ bookingId, otherUser, onClose }) => {
           </button>
         </div>
       </form>
+
+      {/* Call Window */}
+      <CallWindow 
+        isOpen={showCallWindow}
+        onClose={handleCloseCallWindow}
+        callData={callData}
+        isIncoming={!!incomingCall}
+        onAnswer={handleAnswerCall}
+        onReject={handleRejectCall}
+      />
     </div>
   );
 };
